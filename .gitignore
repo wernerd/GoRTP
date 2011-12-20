@@ -1,0 +1,10 @@
+*~
+*.kdev4
+.kdev*
+_go_.*
+bin/
+/pkg/
+build/
+UseDoxygen/
+_obj/
+go/pkg
