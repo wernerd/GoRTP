@@ -7,4 +7,7 @@ bin/
 build/
 UseDoxygen/
 _obj/
-go/pkg
+_test/
+[68].out
+_*.*
+
