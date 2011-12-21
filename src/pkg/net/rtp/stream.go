@@ -21,6 +21,7 @@ package rtp
 import (
     "crypto/rand"
     "time"
+    "sync"
 )
 
 const (
@@ -94,9 +95,10 @@ type RecvReportData struct {
 }
 
 type SsrcStream struct {
-    streamType     int
-    streamStatus   int
-    Address        // Own or remote address for this output stream
+    streamType   int
+    streamStatus int
+    streamMutex  sync.Mutex
+    Address      // Own or remote address for this output stream
     SenderInfoData
     RecvReportData // store receiver reports that belong to this output stream
     SdesItems      SdesItemMap
@@ -365,14 +367,15 @@ func (si *SsrcStream) checkSsrcIncomingData(existingStream bool, rs *Session, rp
                 si.DataPort = rp.fromAddr.DataPort
             }
         } else {
-            // Collision or loop of own packets. In this case strOut == si
-            // dispatch a BYE for a new confilicting output stream, using old SSRC
-            // renew the output stream's SSRC
+            // Collision or loop of own packets. In this case si was found in ouput stream map, 
+            // thus cannot be in input stream map
             if rs.checkConflictData(&rp.fromAddr) {
                 // Optional error counter.
                 result = false
             } else {
                 // New collision
+                // dispatch a BYE for a new confilicting output stream, using old SSRC
+                // renew the output stream's SSRC
                 rs.WriteCtrl(rs.buildRtcpByePkt(strOut, "SSRC collision detected when receiving RTCP packet."))
                 rs.replaceStream(strOut)
                 si.IpAddr = rp.fromAddr.IpAddr
@@ -387,7 +390,7 @@ func (si *SsrcStream) checkSsrcIncomingData(existingStream bool, rs *Session, rp
 
 // recordReceptionData checks validity (probation), sequence numbers, computes jitter, and records the statistics for incoming data packets.
 // See algorithms in chapter A.1 (sequence number handling) and A.8 (jitter computation)
-func (si *SsrcStream) recordReceptionData(rp *DataPacket, recvTime int64) (result bool) {
+func (si *SsrcStream) recordReceptionData(rp *DataPacket, rs *Session, recvTime int64) (result bool) {
     result = true
 
     seq := rp.Sequence()
@@ -449,15 +452,15 @@ func (si *SsrcStream) recordReceptionData(rp *DataPacket, recvTime int64) (resul
         si.statistics.octetCount += uint32(len(rp.Payload()))
         si.statistics.lastPacketTime = recvTime
         if si.statistics.packetCount == 1 {
-            // it's the first packet from this source
-            si.sender = true
             si.statistics.initialDataTimestamp = rp.Timestamp()
             si.statistics.baseSeqNum = seq
         }
-        // we record the last time a packet from this source
-        // was received, this has statistical interest and is
-        // needed to time out old senders that are no sending
-        // any longer.
+        si.streamMutex.Lock()
+        if !si.sender && rs.rtcpCtrlChan != nil {
+            rs.rtcpCtrlChan <- rtcpIncrementSender
+        }
+        si.sender = true // Activate stream as sender. If it was false new stream or no RTP packets for some time
+        si.streamMutex.Unlock()
 
         // compute the interarrival jitter estimation.
         pt := int(rp.PayloadType())
@@ -635,7 +638,7 @@ func (si *SsrcStream) parseSdesChunk(sc sdesChunk) {
         txtLen := sc.getItemLen(offset)
         itemTxt := sc.getItemText(offset, txtLen)
         offset += 2 + txtLen
-        if name, ok := si.SdesItems[itemType]; ok &&  name == itemTxt {
+        if name, ok := si.SdesItems[itemType]; ok && name == itemTxt {
             continue
         }
         txt := make([]byte, len(itemTxt))

@@ -218,7 +218,7 @@ func fullDuplex() {
     go sendLocalToRemote()
     go sendRemoteToLocal()
 
-    time.Sleep(3e9)
+    time.Sleep(8e9)
 
     stop = true
     time.Sleep(30e6) // allow to drain the sender
