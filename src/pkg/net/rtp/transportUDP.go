@@ -194,7 +194,7 @@ func (tp *TransportUDP) readCtrlPacket() {
         if err != nil {
             break
         }
-        rp := newCtrlPacket()
+        rp, _ := newCtrlPacket()
         rp.fromAddr.IpAddr = addr.IP
         rp.fromAddr.CtrlPort = addr.Port
         rp.fromAddr.DataPort = 0

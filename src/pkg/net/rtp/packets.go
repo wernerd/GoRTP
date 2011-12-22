@@ -29,7 +29,8 @@ const (
     freeListLengthRtp  = 10
     freeListLengthRtcp = 5
     rtpHeaderLength    = 12
-    rtcpHeaderLength   = 8
+    rtcpHeaderLength   = 4
+    rtcpSsrcLength     = 4
     padToMultipleOf    = 4
 )
 
@@ -476,7 +477,7 @@ type CtrlPacket struct {
 var freeListRtcp = make(chan *CtrlPacket, freeListLengthRtcp)
 
 // newCtrlPacket gets a raw packet, initializes the first fixed RTCP header, advances inUse to point after new fixed header.
-func newCtrlPacket() (rp *CtrlPacket) {
+func newCtrlPacket() (rp *CtrlPacket, offset int) {
 
     // Grab a packet if available; allocate if not.
     select {
@@ -487,19 +488,22 @@ func newCtrlPacket() (rp *CtrlPacket) {
     }
     rp.buffer[0] = version2Bit // RTCP: V = 2, P, RC = 0
     rp.inUse = rtcpHeaderLength
+    offset = rtcpHeaderLength
     return
 }
 
 // addHeaderCtrl adds a new fixed RTCP header field into the compound, initializes, advances inUse to point after new fixed header.
-func (rp *CtrlPacket) addHeaderCtrl(offset int) {
+func (rp *CtrlPacket) addHeaderCtrl(offset int) int {
     rp.buffer[offset] = version2Bit // RTCP: V = 2, P, RC = 0
     rp.inUse += 4
+    return rp.inUse
 }
 
 // addHeaderSsrc adds a SSRC header into the compound (usually after fixed header field), advances inUse to point after SSRC.
-func (rp *CtrlPacket) addHeaderSsrc(offset int, ssrc uint32) {
+func (rp *CtrlPacket) addHeaderSsrc(offset int, ssrc uint32) int {
     binary.BigEndian.PutUint32(rp.buffer[offset:], ssrc)
     rp.inUse += 4
+    return rp.inUse
 }
 
 func (rp *CtrlPacket) FreePacket() {
@@ -576,9 +580,10 @@ type byeData []byte
  */
 
 // newSenderInfo returns a senderInfo which is positioned at the current inUse offet and advances inUse to point after senderInfo.
-func (rp *CtrlPacket) newSenderInfo() (info senderInfo) {
+func (rp *CtrlPacket) newSenderInfo() (info senderInfo, offset int) {
     info = rp.toSenderInfo(rp.inUse)
     rp.inUse += len(info)
+    offset = rp.inUse
     return
 }
 
@@ -636,9 +641,10 @@ func (in senderInfo) setOctetCount(cnt uint32) {
  */
 
 // newSenderInfo returns a senderInfo which is positioned at the current inUse offet and advances inUse to point after senderInfo.
-func (rp *CtrlPacket) newRecvReport() (report recvReport) {
+func (rp *CtrlPacket) newRecvReport() (report recvReport, offset int) {
     report = rp.toRecvReport(rp.inUse)
     rp.inUse += len(report)
+    offset = rp.inUse
     return
 }
 
@@ -727,9 +733,10 @@ func (rr recvReport) setDlsr(dlsr uint32) {
  */
 
 // newSdesChunk returns a SDES chunk which is positioned at the current inUse offet and advances inUse to point after sdesChunk.
-func (rp *CtrlPacket) newSdesChunk(length int) (chunk sdesChunk) {
+func (rp *CtrlPacket) newSdesChunk(length int) (chunk sdesChunk, offset int) {
     chunk = rp.toSdesChunk(rp.inUse, length)
     rp.inUse += len(chunk)
+    offset = rp.inUse
     return
 }
 
@@ -784,9 +791,10 @@ func (sc sdesChunk) chunkLen() int {
 }
 
 // newByePacket returns a BYE data structure which is positioned at the current inUse offet and advances inUse to point after BYE.
-func (rp *CtrlPacket) newByeData(length int) (bye byeData) {
+func (rp *CtrlPacket) newByeData(length int) (bye byeData, offset int) {
     bye = rp.toByeData(rp.inUse, length)
     rp.inUse += len(bye)
+    offset = rp.inUse
     return
 }
 // toByePacket returns the BYE byte slices inside the RTCP packet buffer as byePacket type.

@@ -196,50 +196,51 @@ func (str *SsrcStream) NewDataPacket(stamp uint32) (rp *DataPacket) {
 // NewRtpPacket creates a new RTCP packet suitable for use with the stream.
 //
 // This method returns a new initialized RTCP packet that contains the sender's SSRC.
-func (str *SsrcStream) NewCtrlPacket(pktType int) (rp *CtrlPacket) {
-    rp = newCtrlPacket()
+func (str *SsrcStream) NewCtrlPacket(pktType int) (rp *CtrlPacket, offset int) {
+    rp, offset = newCtrlPacket()
     rp.SetType(0, pktType)
     rp.SetSsrc(0, str.ssrc)
     return
 }
 
 // AddHeaderCtrl adds a new fixed RTCP header word into the compound, does not set SSRC after fixed header field
-func (str *SsrcStream) addCtrlHeader(rp *CtrlPacket, offset, pktType int) {
-    rp.addHeaderCtrl(offset)
+func (str *SsrcStream) addCtrlHeader(rp *CtrlPacket, offset, pktType int) (newOffset int) {
+    newOffset = rp.addHeaderCtrl(offset)
     rp.SetType(offset, pktType)
+    return
 }
 
 // newSsrc generates a random SSRC and sets it in stream
-func (so *SsrcStream) newSsrc() {
+func (str *SsrcStream) newSsrc() {
     var randBuf [4]byte
     rand.Read(randBuf[:])
     ssrc := uint32(randBuf[0])
     ssrc |= uint32(randBuf[1]) << 8
     ssrc |= uint32(randBuf[2]) << 16
     ssrc |= uint32(randBuf[3]) << 24
-    so.ssrc = ssrc
+    str.ssrc = ssrc
 
 }
 
 // newInitialTimestamp creates a random initiali timestamp for outgoing packets
-func (so *SsrcStream) newInitialTimestamp() {
+func (str *SsrcStream) newInitialTimestamp() {
     var randBuf [4]byte
     rand.Read(randBuf[:])
     tmp := uint32(randBuf[0])
     tmp |= uint32(randBuf[1]) << 8
     tmp |= uint32(randBuf[2]) << 16
     tmp |= uint32(randBuf[3]) << 24
-    so.initialStamp = (tmp & 0xFFFFFFF)
+    str.initialStamp = (tmp & 0xFFFFFFF)
 }
 
 // newSequence generates a random sequence and sets it in stream
-func (so *SsrcStream) newSequence() {
+func (str *SsrcStream) newSequence() {
     var randBuf [2]byte
     rand.Read(randBuf[:])
     sequenceNo := uint16(randBuf[0])
     sequenceNo |= uint16(randBuf[1]) << 8
     sequenceNo &= 0xEFFF
-    so.sequenceNumber = sequenceNo
+    str.sequenceNumber = sequenceNo
 }
 
 // readRecvReport reads data from receive report and fills it into output stream RecvReportData structure
@@ -252,9 +253,8 @@ func (so *SsrcStream) readRecvReport(report recvReport) {
     so.Dlsr = report.dlsr()
 }
 
-// makeSenderInfo create the senderInfo at the current inUse position and returns offset that points after the senderInfo.
-func (so *SsrcStream) makeSenderInfo(rp *CtrlPacket) int {
-    info := rp.newSenderInfo()
+// fillSenderInfo fills in the senderInfo.
+func (so *SsrcStream) fillSenderInfo(info senderInfo) {
     info.setOctetCount(so.SenderOctectCnt)
     info.setPacketCount(so.SenderPacketCnt)
     tm := time.Now().UnixNano()
@@ -265,19 +265,18 @@ func (so *SsrcStream) makeSenderInfo(rp *CtrlPacket) int {
     tm1 *= uint32(PayloadFormatMap[int(so.payloadType)].ClockRate / 1e3) // compute number of samples
     tm1 += so.initialStamp
     info.setRtpTimeStamp(tm1)
-    return rp.InUse()
 }
 
 // makeSdesChunk creates an SDES chunk at the current inUse position and returns offset that points after the chunk.
-func (so *SsrcStream) makeSdesChunk(rc *CtrlPacket) int {
-    chunk := rc.newSdesChunk(so.sdesChunkLen)
+func (so *SsrcStream) makeSdesChunk(rc *CtrlPacket) (newOffset int) {
+    chunk, newOffset := rc.newSdesChunk(so.sdesChunkLen)
     copy(chunk, nullArray[:]) // fill with zeros before using
     chunk.setSsrc(so.ssrc)
     itemOffset := 4
     for itemType, name := range so.SdesItems {
         itemOffset += chunk.setItemData(itemOffset, byte(itemType), name)
     }
-    return rc.InUse()
+    return
 }
 
 // SetSdesItem set a new SDES item or overwrites an existing one with new text (string).
@@ -302,17 +301,17 @@ func (so *SsrcStream) SetSdesItem(itemType int, itemText string) bool {
 
 // makeByeData creates a by data block after the BYE RTCP header field.
 // Currently only one SSRC for bye data supported. Additional CSRCs requiere addiitonal data structure in output stream.
-func (so *SsrcStream) makeByeData(rc *CtrlPacket, reason string) int {
+func (so *SsrcStream) makeByeData(rc *CtrlPacket, reason string) (newOffset int) {
     length := 4
     if len(reason) > 0 {
         length += (len(reason) + 3 + 1) & ^3 // plus one is the length field
     }
-    bye := rc.newByeData(length)
+    bye, newOffset := rc.newByeData(length)
     bye.setSsrc(0, so.ssrc)
     if len(reason) > 0 {
         bye.setReason(reason, 1)
     }
-    return rc.InUse()
+    return
 }
 
 /* 
@@ -531,9 +530,9 @@ func (si *SsrcStream) checkSsrcIncomingCtrl(existingStream bool, rs *Session, fr
 // makeRecvReport fills a receiver report at the current inUse position and returns offset that points after the report.
 // See chapter A.3 in RFC 3550 regarding the packet lost algorithm, end of chapter 6.4.1 regarding LSR, DLSR stuff.
 //
-func (si *SsrcStream) makeRecvReport(rp *CtrlPacket) int {
+func (si *SsrcStream) makeRecvReport(rp *CtrlPacket) (newOffset int) {
 
-    report := rp.newRecvReport()
+    report, newOffset := rp.newRecvReport()
 
     extMaxSeq := si.statistics.seqNumAccum + uint32(si.statistics.maxSeqNum)
     expected := extMaxSeq - uint32(si.statistics.baseSeqNum) + 1
@@ -572,7 +571,7 @@ func (si *SsrcStream) makeRecvReport(rp *CtrlPacket) int {
     report.setLsr(lsr)
     report.setDlsr(dlsr)
 
-    return rp.InUse()
+    return
 }
 
 func (si *SsrcStream) readSenderInfo(info senderInfo) {

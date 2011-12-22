@@ -316,6 +316,14 @@ func rtpPacket(t *testing.T) {
     }
 }
 
+func intervalCheck(t *testing.T) {
+//                     members, senders, RTCP bandwidth, packet length, weSent, initial
+    tm, _ := rtcpInterval(1,       0,        3500.0,         80.0,       false,  true)
+    fmt.Printf("Interval: %d\n", tm)
+    tm, _ = rtcpInterval(100,     0,        3500.0,         160.0,       false,  true)
+    fmt.Printf("Interval: %d\n", tm)
+}
+
 func ntpCheck(t *testing.T) {
     tm := time.Now().UnixNano()
     high, low := toNtpStamp(tm)
@@ -338,4 +346,5 @@ func TestRtpPacket(t *testing.T) {
     parseFlags()
     rtpPacket(t)
     ntpCheck(t)
+//    intervalCheck(t)
 }

@@ -44,6 +44,9 @@ var stopRemoteRecv chan bool
 var stopLocalCtrl chan bool
 var stopRemoteCtrl chan bool
 
+var eventNamesNew = []string{"NewStreamData", "NewStreamCtrl"}
+var eventNamesRtcp = []string{"SR", "RR", "SDES", "BYE"}
+
 // Create a RTP packet suitable for standard stream (index 0) with a payload length of 160 bytes
 // The method initializes the RTP packet with SSRC, sequence number, and RTP version number. 
 // If the payload type was set with the RTP stream then the payload type is also set in
@@ -58,7 +61,25 @@ func sendLocalToRemote() {
         rsLocal.WriteData(rp)
         rp.FreePacket()
         if (cnt % 50) == 0 {
-            println("Local sent:", cnt, "packets")
+            fmt.Printf("Local sent %d packets\n", cnt)
+        }
+        cnt++
+        stamp += 160
+        time.Sleep(20e6)
+    }
+}
+
+func sendLocalToRemoteIdx(index uint32) {
+
+    var cnt int
+    stamp := uint32(0)
+    for !stop {
+        rp := rsLocal.NewDataPacketForStream(index, stamp)
+        rp.SetPayload(localPay[:])
+        rsLocal.WriteData(rp)
+        rp.FreePacket()
+        if (cnt % 50) == 0 {
+            fmt.Printf("Local with index sent %d packets\n", cnt)
         }
         cnt++
         stamp += 160
@@ -76,7 +97,7 @@ func sendRemoteToLocal() {
         rsRemote.WriteData(rp)
         rp.FreePacket()
         if (cnt % 50) == 0 {
-            println("Remote sent:", cnt, "packets")
+            fmt.Printf("Remote sent %d packets\n", cnt)
         }
         cnt++
         stamp += 160
@@ -93,7 +114,7 @@ func receivePacketLocal() {
         select {
         case rp := <-dataReceiver: // just get a packet - maybe we add some tests later
             if (cnt % 50) == 0 {
-                println("Remote receiver got:", cnt, "packets")
+                fmt.Printf("Remote receiver got %d packets\n", cnt)
             }
             cnt++
             rp.FreePacket()
@@ -112,7 +133,7 @@ func receivePacketRemote() {
         select {
         case rp := <-dataReceiver: // just get a packet - maybe we add some tests later
             if (cnt % 50) == 0 {
-                println("Remote receiver got:", cnt, "packets")
+                fmt.Printf("Remote receiver got: %d packets\n", cnt)
             }
             cnt++
             rp.FreePacket()
@@ -131,7 +152,13 @@ func receiveCtrlLocal() {
             fmt.Println("Local: Length of event slice:", len(evSlice))
             for _, event := range evSlice {
                 if event != nil {
-                    fmt.Printf("Local: received ctrl event, type: %d, ssrc: %d, %s\n", event.EventType, event.Ssrc, event.ByeReason)
+                    var eventName string
+                    if event.EventType < 200 {
+                        eventName = eventNamesNew[event.EventType]
+                    } else {
+                        eventName = eventNamesRtcp[event.EventType-200]
+                    }
+                    fmt.Printf("Local: received ctrl event, type: %s, ssrc: %d, %s\n", eventName, event.Ssrc, event.ByeReason)
                 } else {
                     fmt.Println("Local: unexpected nil event")
                 }
@@ -151,7 +178,13 @@ func receiveCtrlRemote() {
             fmt.Println("Remote: Length of event slice:", len(evSlice))
             for _, event := range evSlice {
                 if event != nil {
-                    fmt.Printf("Remote: received ctrl event, type: %d, ssrc: %d, %s\n", event.EventType, event.Ssrc, event.ByeReason)
+                    var eventName string
+                    if event.EventType < 200 {
+                        eventName = eventNamesNew[event.EventType]
+                    } else {
+                        eventName = eventNamesRtcp[event.EventType-200]
+                    }
+                    fmt.Printf("Remote: received ctrl event, type: %s, ssrc: %d, %s\n", eventName, event.Ssrc, event.ByeReason)
                 } else {
                     fmt.Println("Remote: unexpected nil event")
                 }
@@ -177,7 +210,7 @@ func initialize() {
 }
 
 func fullDuplex() {
-    println("Starting full duplex test.")
+    fmt.Println("Starting full duplex test.")
 
     // Create a UDP transport with "local" address and use this for a "local" RTP session
     // The RTP session uses the transport to receive and send RTP packets to the remote peer.
@@ -230,10 +263,73 @@ func fullDuplex() {
 
     time.Sleep(10e6)
 
-    println("Full duplex test done.")
+    fmt.Println("Full duplex test done.")
+}
+
+func fullDuplexTwoStreams() {
+    fmt.Println("Starting full duplex test with two output streams from local to remote.")
+
+    // Create a UDP transport with "local" address and use this for a "local" RTP session
+    // The RTP session uses the transport to receive and send RTP packets to the remote peer.
+    tpLocal, _ := rtp.NewTransportUDP(local, localPort)
+
+    // TransportUDP implements TransportWrite and TransportRecv interfaces thus
+    // use it to initialize the Session for both interfaces.
+    rsLocal = rtp.NewSession(tpLocal, tpLocal)
+
+    // Add address of a remote peer (participant)
+    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1})
+
+    // Create a media stream. 
+    // The SSRC identifies the stream. Each stream has its own sequence number and other 
+    // context. A RTP session can have several RTP stream for example to send several
+    // streams of the same media.
+    //
+    strLocalIdx := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
+    rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
+
+    // create a second output stream
+    strLocalIdx = rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 11223344, 1234)
+    rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
+
+    // Create the same set for a "remote" peer and use the "local" as its remote peer. Remote peer has one output stream only.
+    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort)
+    rsRemote = rtp.NewSession(tpRemote, tpRemote)
+    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1})
+
+    strRemoteIdx := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
+    rsRemote.SsrcStreamOutForIndex(strRemoteIdx).SetPayloadType(0)
+
+    go receivePacketLocal()
+    go receivePacketRemote()
+
+    go receiveCtrlLocal()
+    go receiveCtrlRemote()
+
+    rsLocal.StartSession()
+    rsRemote.StartSession()
+
+    go sendLocalToRemote()
+    go sendLocalToRemoteIdx(strLocalIdx)
+    go sendRemoteToLocal()
+
+    time.Sleep(8e9)
+
+    stop = true
+    time.Sleep(30e6) // allow to drain the sender
+    stopRemoteRecv <- true
+    stopLocalRecv <- true
+
+    rsLocal.CloseSession()
+    rsRemote.CloseSession()
+
+    time.Sleep(10e6)
+
+    fmt.Printf("Full duplex test with 2 output streams done.")
 }
 
 func main() {
     initialize()
-    fullDuplex()
+//    fullDuplex()
+    fullDuplexTwoStreams()
 }
