@@ -109,7 +109,7 @@ func (tp *TransportUDP) CloseRecv() {
 }
 
 // setEndChannel receives and set the channel to signal back after network socket was closed and receive loop terminated. 
-func (tp *TransportUDP) setEndChannel(ch TransportEnd) {
+func (tp *TransportUDP) SetEndChannel(ch TransportEnd) {
     tp.transportEnd = ch
 }
 
@@ -173,9 +173,8 @@ func (tp *TransportUDP) readDataPacket() {
             tp.callUpper.OnRecvData(rp)
         }
     }
-    //    fmt.Printf("recv RTP packet loop terminated\n")
     tp.dataConn.Close()
-    tp.transportEnd <- dataTransportRecvStopped
+    tp.transportEnd <- DataTransportRecvStopped
 }
 
 func (tp *TransportUDP) readCtrlPacket() {
@@ -205,8 +204,7 @@ func (tp *TransportUDP) readCtrlPacket() {
             tp.callUpper.OnRecvCtrl(rp)
         }
     }
-    //    fmt.Printf("recv RTCP packet loop terminated\n")
     tp.ctrlConn.Close()
-    tp.transportEnd <- ctrlTransportRecvStopped
+    tp.transportEnd <- CtrlTransportRecvStopped
 
 }

@@ -38,6 +38,7 @@ func initSessions() {
     strIdx := rsRecv.NewSsrcStreamOut(&Address{recvAddr.IP, recvPort, recvPort + 1}, 0x01020304, 0x4711)
     rsRecv.SsrcStreamOutForIndex(strIdx).SetSdesItem(SdesCname, "AAAAAA")
     rsRecv.SsrcStreamOutForIndex(strIdx).SetPayloadType(0)
+    rsRecv.rtcpServiceActive = true // to simulate an active RTCP service
 
     tpSender, _ := NewTransportUDP(senderAddr, senderPort)
     rsSender = NewSession(tpSender, tpSender)
@@ -173,12 +174,11 @@ func rtpReceive(t *testing.T) {
     receivePacket(t, 5)
 
     // Create a RTCP packet and fill in senderInfo of the output stream
-    rcTime, offset := strOut.NewCtrlPacket(RtcpSR)
+    rcTime, offset := strOut.newCtrlPacket(RtcpSR)
     rcTime.addHeaderSsrc(offset, strOut.Ssrc())
 
     newInfo, _ := rcTime.newSenderInfo()
     strOut.fillSenderInfo(newInfo) // create a sender info block after fixed header and SSRC.
-
 
     // the above jitter test took 90ms. Thus the difference between session start and now is about 90ms and
     // the RTP timestamp should be 720 units for the selected payload (PCMU, 8000Hz). To get this we have
@@ -209,14 +209,13 @@ func rtpReceive(t *testing.T) {
     rsRecv.streamsOut[0].sender = true
 
     // build a RTCP packet for the standard output stream
-    rcSender := rsRecv.buildRtcpPkt(rsRecv.SsrcStreamOut())
-    rsRecv.addSdes(rsRecv.SsrcStreamOut(), rcSender)
+    rcSender := rsRecv.buildRtcpPkt(rsRecv.SsrcStreamOut(), 31)
 
     rcSender.fromAddr.IpAddr = senderAddr.IP
     rcSender.fromAddr.DataPort = 0
     rcSender.fromAddr.CtrlPort = senderPort + 1
 
-    // **** fmt.Printf("1st Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
+    // ***    fmt.Printf("1st Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
     rcTotalLength := rcSender.InUse()
     if rcTotalLength != rtcpHeaderLength+rtcpSsrcLength+senderInfoLen+reportBlockLen+20 { // 20: SDES header plus SDES chunk
         t.Errorf("rcSender packet length check failed. Expected: %d, got: %d\n",
@@ -227,7 +226,7 @@ func rtpReceive(t *testing.T) {
         t.Errorf("OnRecvCtrl failed for RTCP packet.\n")
         return
     }
-    // Need to perform a lookup here: with this test we have produced a collision. Now the receiver has two
+    // Need to perform a lookup here: with the last OnRecvCtrl we have produced a collision. Now the receiver has two
     // input streams: one with 0x04030201 and one with 0x01020304. This happened because, for this test,
     // we have produced the control packet from the receiver session and fed that packet into the receiver.
     // The receiver now has a newly initialized output stream (one only) with new random SSRC and sequence numbers.
@@ -251,20 +250,22 @@ func rtpReceive(t *testing.T) {
     rsRecv.streamsOut[0].sender = false
     rsRecv.streamsOut[0].streamStatus = active // just to pass the active check during onRecvCtrl()
 
-    rcSender = rsRecv.buildRtcpPkt(rsRecv.SsrcStreamOut())
-    rsRecv.addSdes(rsRecv.SsrcStreamOut(), rcSender)
+    rsRecv.streamsIn[0].dataAfterLastReport = true // just to simulate received RTP data to generate correct RR
+
+    rcSender = rsRecv.buildRtcpPkt(rsRecv.SsrcStreamOut(), 31)
 
     rcSender.fromAddr.IpAddr = senderAddr.IP
     rcSender.fromAddr.DataPort = 0
     rcSender.fromAddr.CtrlPort = senderPort + 3 // just to avoid an addtional conflict - but collosion will happen
 
-    // **** fmt.Printf("2nd Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
+    // ***    fmt.Printf("2nd Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
     rcTotalLength = rcSender.InUse()
 
-    // we have 2 receiver reports here - see test above
-    if rcTotalLength != rtcpHeaderLength+rtcpSsrcLength+2*reportBlockLen+20 { // 20: SDES header plus SDES chunk
+    // we have still have 1 receiver report here because the second receiver generated (see test above) never
+    // sent an RTP packet, thus is not included in RR
+    if rcTotalLength != rtcpHeaderLength+rtcpSsrcLength+reportBlockLen+20 { // 20: SDES header plus SDES chunk
         t.Errorf("rcSender packet length check failed. Expected: %d, got: %d\n",
-            rtcpHeaderLength+rtcpSsrcLength+2*reportBlockLen+20, rcTotalLength)
+            rtcpHeaderLength+rtcpSsrcLength+reportBlockLen+20, rcTotalLength)
         return
     }
     if !rsRecv.OnRecvCtrl(rcSender) {
@@ -297,12 +298,12 @@ func rtpReceive(t *testing.T) {
 
     rcSender = rsRecv.buildRtcpByePkt(rsRecv.SsrcStreamOut(), "CCCCCC")
     rcTotalLength = rcSender.InUse()
-    // **** fmt.Printf("3rd Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
+    // ***    fmt.Printf("3rd Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
 
-    // 20: SDES header plus SDES chunk; 16: BYE RTCP packet 
-    if rcTotalLength != rtcpHeaderLength+rtcpSsrcLength+2*reportBlockLen+20+16 {
+    // BYE packet has empty RR; 20: SDES header plus SDES chunk; 16: BYE RTCP packet
+    if rcTotalLength != rtcpHeaderLength+rtcpSsrcLength+20+16 {
         t.Errorf("rcSender packet length check failed. Expected: %d, got: %d\n",
-            rtcpHeaderLength+rtcpSsrcLength+2*reportBlockLen+20+16, rcTotalLength)
+            rtcpHeaderLength+rtcpSsrcLength+20+16, rcTotalLength)
         return
     }
 

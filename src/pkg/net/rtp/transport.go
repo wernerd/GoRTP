@@ -24,7 +24,7 @@ type TransportRecv interface {
     OnRecvCtrl(rp *CtrlPacket) bool
     SetCallUpper(upper TransportRecv)
     CloseRecv()
-    setEndChannel(ch TransportEnd)
+    SetEndChannel(ch TransportEnd)
 }
 
 type TransportWrite interface {

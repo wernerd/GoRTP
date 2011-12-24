@@ -743,6 +743,9 @@ func (rp *CtrlPacket) newSdesChunk(length int) (chunk sdesChunk, offset int) {
 // toSdesChunk returns the SDES byte slices inside the RTCP packet buffer as sdesChunktype.
 // Use functions for this type to parse and access the report blocks data.
 func (rp *CtrlPacket) toSdesChunk(offset, length int) sdesChunk {
+    if offset > len(rp.buffer) || offset+length > len(rp.buffer) {
+        return nil
+    }
     return rp.buffer[offset : offset+length]
 }
 
@@ -773,21 +776,34 @@ func (sdes sdesChunk) getItemLen(itemOffset int) int {
 }
 
 func (sdes sdesChunk) getItemText(itemOffset, length int) string {
+    if itemOffset+2+length > len(sdes) {
+        return ""
+    }
     return string(sdes[itemOffset+2 : itemOffset+2+length])
 }
 
-func (sc sdesChunk) chunkLen() int {
-    length := 4 // include SSRC field of this chunk    
+func (sc sdesChunk) chunkLen() (int, bool) {
 
+    // length is at least: SSRC plus SdesEnd byte
+    if 4+1 > len(sc) {
+        return 0, false
+    }
+    length := 4 // include SSRC field of this chunk    
     itemType := sc[length]
     if itemType == SdesEnd { // Cover case if chunk has zero items
-        return length + 4
+        if 4+4 > len(sc) { // SSRC (4 byte), SdesEnd (1 byte) plus 3 bytes padding
+            return 0, false
+        }
+        return 8, true
     }
     // Loop over valid items and add their overall length to offset.
-    for ; itemType != SdesEnd && length < len(sc); itemType = sc[length] {
-        length += int(sc[length+1]) + 2
+    for ; itemType != SdesEnd; itemType = sc[length] {
+        length += int(sc[length+1]) + 2 // lenght points to next item type field
+        if length > len(sc) {
+            return 0, false
+        }
     }
-    return (length + 4) &^ 0x3
+    return (length + 4) &^ 0x3, true
 }
 
 // newByePacket returns a BYE data structure which is positioned at the current inUse offet and advances inUse to point after BYE.
@@ -800,17 +816,23 @@ func (rp *CtrlPacket) newByeData(length int) (bye byeData, offset int) {
 // toByePacket returns the BYE byte slices inside the RTCP packet buffer as byePacket type.
 // Use functions for this type to parse and access the BYE data.
 func (rp *CtrlPacket) toByeData(offset, length int) byeData {
+    if offset > len(rp.buffer) || offset+length > len(rp.buffer) {
+        return nil
+    }
     return rp.buffer[offset : offset+length]
 }
 
 // ssrc returns the bye data SSRC at ssrcIdx as 32bit unsigned in host order.
 func (bye byeData) ssrc(ssrcIdx int) uint32 {
-    return binary.BigEndian.Uint32(bye[0+ssrcIdx*4:])
+    if (ssrcIdx+1)*4 > len(bye) {
+        return 0
+    }
+    return binary.BigEndian.Uint32(bye[ssrcIdx*4:])
 }
 
 // setSSrc takes a 32 unsigned SSRC in host order and sets it at ssrcIdx in bye data (network order). 
 func (bye byeData) setSsrc(ssrcIdx int, ssrc uint32) {
-    binary.BigEndian.PutUint32(bye[0+ssrcIdx*4:], ssrc)
+    binary.BigEndian.PutUint32(bye[ssrcIdx*4:], ssrc)
 }
 
 // setReason takes reason text and fills it into the bye data after ssrcCnt SSRC/CSRC entries.
@@ -828,5 +850,8 @@ func (bye byeData) getReason(ssrcCnt int) string {
     }
     length := int(bye[offset])
     offset++
+    if offset+length > len(bye) {
+        return ""
+    }
     return string(bye[offset : offset+length])
 }

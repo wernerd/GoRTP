@@ -98,10 +98,11 @@ type SsrcStream struct {
     streamType   int
     streamStatus int
     streamMutex  sync.Mutex
-    Address      // Own or remote address for this output stream
-    SenderInfoData
-    RecvReportData // store receiver reports that belong to this output stream
-    SdesItems      SdesItemMap
+    Address      // Own if it is an output stream, remote address in case of input stream
+    SenderInfoData // Sender reports if this is an input stream, read only.
+    RecvReportData // Receiver reports if this is an output stream, read anly.
+    SdesItems      SdesItemMap // SDES item map, indexed by the RTCP SDES item types constants. 
+    // Read only, to set item use SetSdesItem()
     sdesChunkLen   int // pre-computed SDES chunk length - updated when setting a new name, relevant for output streams
 
     // the following two field are active for input streams ony
@@ -116,6 +117,9 @@ type SsrcStream struct {
     ssrc           uint32
     payloadType    byte
     sender         bool // true if this source (ouput or input) was identified as active sender
+
+    // For input streams: true if RTP packet seen after last RR
+    dataAfterLastReport bool
 }
 
 const defaultCname = "Go RTP stack 0.9"
@@ -128,32 +132,44 @@ const seqNumMod = (1 << 16)
  * *****************************************************************
  */
 
-// Ssrc return the SSRC for this stream.
+// Ssrc returns the SSRC of this stream in host order.
 func (str *SsrcStream) Ssrc() uint32 {
     return str.ssrc
 }
 
-// SequenceNo return the current RTP packet sequence number for this stream.
+// SequenceNo returns the current RTP packet sequence number of this stream in host order.
 func (str *SsrcStream) SequenceNo() uint16 {
     return str.sequenceNumber
 }
 
-// SetPayloadType sets the payload type for this stream.
+// SetPayloadType sets the payload type of this stream.
 //
 // According to RFC 3550 an application may change the payload type during a
-// the livetime of a RTP stream.
-func (str *SsrcStream) SetPayloadType(pt byte) {
+// the lifetime of a RTP stream. Refer to rtp.PayloadFormat type.
+//
+// The method returns false and does not set the payload type if the payload format
+// is not available in rtp.PayloadFormatMap. An application must either use a known
+// format or set the new payload format at the correct index before it sets the
+// payload type of the stream.
+//
+//  pt - the payload type number.
+//
+func (str *SsrcStream) SetPayloadType(pt byte) (ok bool) {
+    if _, ok = PayloadFormatMap[int(pt)]; !ok {
+        return
+    }
     str.payloadType = pt
+    return
 }
 
-// PayloadType returns the payload type set for this stream.
+// PayloadType returns the payload type of this stream.
 func (str *SsrcStream) PayloadType() byte {
     return str.payloadType
 }
 
 /* 
  * *****************************************************************
- * Processing for output streamsSsrcStreamOut
+ * Processing for output streams
  * *****************************************************************
  */
 
@@ -179,11 +195,22 @@ func newSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16) (so *SsrcStr
     return
 }
 
-// NewRtpPacket creates a new RTP packet suitable for use with the standard output stream.
+// newDataPacket creates a new RTP packet suitable for use with the output stream.
 //
 // This method returns an initialized RTP packet that contains the correct SSRC, sequence
-// number, and payload type if payload type was set in the stream. 
-func (str *SsrcStream) NewDataPacket(stamp uint32) (rp *DataPacket) {
+// number, the updated timestamp, and payload type if payload type was set in the stream.
+//
+// The application computes the next stamp based on the payload's frequency. The stamp usually
+// advances by the number of samples contained in the RTP packet. 
+//
+// For example PCMU with a 8000Hz frequency sends 160 samples every 20m - thus the timestamp
+// must adavance by 160 for each following packet. For fixed codecs, for example PCMU, the 
+// number of samples correspond to the payload length. For variable codecs the number of samples
+// has no direct relationship with the payload length.
+//
+//   stamp - the RTP timestamp for this packet. 
+//
+func (str *SsrcStream) newDataPacket(stamp uint32) (rp *DataPacket) {
     rp = newDataPacket()
     rp.SetSsrc(str.ssrc)
     rp.SetPayloadType(str.payloadType)
@@ -193,10 +220,16 @@ func (str *SsrcStream) NewDataPacket(stamp uint32) (rp *DataPacket) {
     return
 }
 
-// NewRtpPacket creates a new RTCP packet suitable for use with the stream.
+// newCtrlPacket creates a new RTCP packet suitable for use with the specified output stream.
 //
-// This method returns a new initialized RTCP packet that contains the sender's SSRC.
-func (str *SsrcStream) NewCtrlPacket(pktType int) (rp *CtrlPacket, offset int) {
+// This method returns an initialized RTCP packet that contains the correct SSRC, and the RTCP packet
+// type. In addition the method returns the offset to the next position inside the buffer.
+//  
+//
+//   streamindex - the index of the output stream as returned by NewSsrcStreamOut
+//   stamp       - the RTP timestamp for this packet.
+//
+func (str *SsrcStream) newCtrlPacket(pktType int) (rp *CtrlPacket, offset int) {
     rp, offset = newCtrlPacket()
     rp.SetType(0, pktType)
     rp.SetSsrc(0, str.ssrc)
@@ -316,7 +349,7 @@ func (so *SsrcStream) makeByeData(rc *CtrlPacket, reason string) (newOffset int)
 
 /* 
  * *****************************************************************
- * SsrcStreamIn
+ *  Processing for input streams
  * *****************************************************************
  */
 
@@ -449,16 +482,17 @@ func (si *SsrcStream) recordReceptionData(rp *DataPacket, rs *Session, recvTime 
         // the packet is considered valid.
         si.statistics.packetCount++
         si.statistics.octetCount += uint32(len(rp.Payload()))
-        si.statistics.lastPacketTime = recvTime
         if si.statistics.packetCount == 1 {
             si.statistics.initialDataTimestamp = rp.Timestamp()
             si.statistics.baseSeqNum = seq
         }
         si.streamMutex.Lock()
+        si.statistics.lastPacketTime = recvTime
         if !si.sender && rs.rtcpCtrlChan != nil {
             rs.rtcpCtrlChan <- rtcpIncrementSender
         }
-        si.sender = true // Activate stream as sender. If it was false new stream or no RTP packets for some time
+        si.sender = true // Stream is sender. If it was false new stream or no RTP packets for some time
+        si.dataAfterLastReport = true
         si.streamMutex.Unlock()
 
         // compute the interarrival jitter estimation.

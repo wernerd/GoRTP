@@ -32,7 +32,7 @@ var parsed bool
 var payload = []byte{0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20}
 var payloadNull = []byte{}
 
-var initialPacket = []byte{0x80, 0x77, 0x47, 0x11, 0xf0, 0xe0, 0xd0, 0xc0, 0x01, 0x02, 0x03, 0x04,
+var initialPacket = []byte{0x80, 0x03, 0x47, 0x11, 0xf0, 0xe0, 0xd0, 0xc0, 0x01, 0x02, 0x03, 0x04,
     0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20}
 
 var csrc_1 = []uint32{0x21435465, 0x65544322}
@@ -166,7 +166,7 @@ func rtpPacket(t *testing.T) {
     // streams of the same media.
     //
     strIdx := rsLocal.NewSsrcStreamOut(&Address{local.IP, port, port+1}, 0x01020304, 0x4711)
-    rsLocal.SsrcStreamOutForIndex(strIdx).SetPayloadType(0x77)
+    rsLocal.SsrcStreamOutForIndex(strIdx).SetPayloadType(3)
 
     // Create a RTP packet suitable for standard stream (index 0) with a payload length of 160 bytes
     // The method initializes the RTP packet with SSRC, sequence number, and RTP version number. 
@@ -214,23 +214,23 @@ func rtpPacket(t *testing.T) {
         }
     }
     rp.SetMarker(true)
-    if buf[markerPtOffset] != 0xf7 {
-        t.Error(fmt.Sprintf("Marker/PT check 1 failed. Expected: 0xf7, got: %x\n", buf[markerPtOffset]))
+    if buf[markerPtOffset] != 0x83 {
+        t.Error(fmt.Sprintf("Marker/PT check 1 failed. Expected: 0x83, got: %x\n", buf[markerPtOffset]))
         return
     }
     pt := rp.PayloadType()
-    if pt != 0x77 {
-        t.Error(fmt.Sprintf("PT-after-Marker check 1 failed. Expected: 0x77, got: %x\n", pt))
+    if pt != 3 {
+        t.Error(fmt.Sprintf("PT-after-Marker check 1 failed. Expected: 3, got: %x\n", pt))
         return
     }
     rp.SetMarker(false)
-    if buf[markerPtOffset] != 0x77 {
-        t.Error(fmt.Sprintf("Marker/PT check 2 failed. Expected: 0x77, got: %x\n", buf[markerPtOffset]))
+    if buf[markerPtOffset] != 3 {
+        t.Error(fmt.Sprintf("Marker/PT check 2 failed. Expected: 3, got: %x\n", buf[markerPtOffset]))
         return
     }
     pt = rp.PayloadType()
-    if pt != 0x77 {
-        t.Error(fmt.Sprintf("PT-after-Marker check 2 failed. Expected: 0x77, got: %x\n", pt))
+    if pt != 3 {
+        t.Error(fmt.Sprintf("PT-after-Marker check 2 failed. Expected: 3, got: %x\n", pt))
         return
     }
 
