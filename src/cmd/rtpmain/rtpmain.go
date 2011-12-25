@@ -158,7 +158,7 @@ func receiveCtrlLocal() {
                     } else {
                         eventName = eventNamesRtcp[event.EventType-200]
                     }
-                    fmt.Printf("Local: received ctrl event, type: %s, ssrc: %d, %s\n", eventName, event.Ssrc, event.ByeReason)
+                    fmt.Printf("Local: received ctrl event, type: %s, ssrc: %d, %s\n", eventName, event.Ssrc, event.Reason)
                 } else {
                     fmt.Println("Local: unexpected nil event")
                 }
@@ -184,7 +184,7 @@ func receiveCtrlRemote() {
                     } else {
                         eventName = eventNamesRtcp[event.EventType-200]
                     }
-                    fmt.Printf("Remote: received ctrl event, type: %s, ssrc: %d, %s\n", eventName, event.Ssrc, event.ByeReason)
+                    fmt.Printf("Remote: received ctrl event, type: %s, ssrc: %d, %s\n", eventName, event.Ssrc, event.Reason)
                 } else {
                     fmt.Println("Remote: unexpected nil event")
                 }
@@ -228,7 +228,7 @@ func fullDuplex() {
     // context. A RTP session can have several RTP stream for example to send several
     // streams of the same media.
     //
-    strLocalIdx := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
+    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
     rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
 
     // Create the same set for a "remote" peer and use the "local" as its remote peer
@@ -236,7 +236,7 @@ func fullDuplex() {
     rsRemote = rtp.NewSession(tpRemote, tpRemote)
     rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1})
 
-    strRemoteIdx := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
+    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
     rsRemote.SsrcStreamOutForIndex(strRemoteIdx).SetPayloadType(0)
 
     go receivePacketLocal()
@@ -285,11 +285,11 @@ func fullDuplexTwoStreams() {
     // context. A RTP session can have several RTP stream for example to send several
     // streams of the same media.
     //
-    strLocalIdx := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
+    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
     rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
 
     // create a second output stream
-    strLocalIdx = rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 11223344, 1234)
+    strLocalIdx, _ = rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 11223344, 1234)
     rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
 
     // Create the same set for a "remote" peer and use the "local" as its remote peer. Remote peer has one output stream only.
@@ -297,7 +297,7 @@ func fullDuplexTwoStreams() {
     rsRemote = rtp.NewSession(tpRemote, tpRemote)
     rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1})
 
-    strRemoteIdx := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
+    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
     rsRemote.SsrcStreamOutForIndex(strRemoteIdx).SetPayloadType(0)
 
     go receivePacketLocal()

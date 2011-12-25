@@ -30,9 +30,10 @@ const (
     maxMisorder   = 100
 )
 
+// The type of the stream.
 const (
-    inputStream = iota
-    outputStream
+    InputStream = iota
+    OutputStream
 )
 
 const (
@@ -122,7 +123,7 @@ type SsrcStream struct {
     dataAfterLastReport bool
 }
 
-const defaultCname = "Go RTP stack 0.9"
+const defaultCname = "GoRTP1.0.0@somewhere"
 
 const seqNumMod = (1 << 16)
 
@@ -167,6 +168,13 @@ func (str *SsrcStream) PayloadType() byte {
     return str.payloadType
 }
 
+
+// StreamType returns stream's type, either input stream or otput stream.
+//
+func (str *SsrcStream) StreamType() int {
+    return str.streamType
+}
+
 /* 
  * *****************************************************************
  * Processing for output streams
@@ -175,7 +183,7 @@ func (str *SsrcStream) PayloadType() byte {
 
 func newSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16) (so *SsrcStream) {
     so = new(SsrcStream)
-    so.streamType = outputStream
+    so.streamType = OutputStream
     so.ssrc = ssrc
     if ssrc == 0 {
         so.newSsrc()
@@ -357,7 +365,7 @@ func (so *SsrcStream) makeByeData(rc *CtrlPacket, reason string) (newOffset int)
 // RTP and RTCP processing to well defined initial values.
 func newSsrcStreamIn(from *Address, ssrc uint32) (si *SsrcStream) {
     si = new(SsrcStream)
-    si.streamType = inputStream
+    si.streamType = InputStream
     si.ssrc = ssrc
     si.IpAddr = from.IpAddr
     si.DataPort = from.DataPort

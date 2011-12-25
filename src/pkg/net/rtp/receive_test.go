@@ -35,7 +35,7 @@ func initSessions() {
     // context. A RTP session can have several RTP stream for example to send several
     // streams of the same media. Need an output stream to test for collisions/loops
     //
-    strIdx := rsRecv.NewSsrcStreamOut(&Address{recvAddr.IP, recvPort, recvPort + 1}, 0x01020304, 0x4711)
+    strIdx, _ := rsRecv.NewSsrcStreamOut(&Address{recvAddr.IP, recvPort, recvPort + 1}, 0x01020304, 0x4711)
     rsRecv.SsrcStreamOutForIndex(strIdx).SetSdesItem(SdesCname, "AAAAAA")
     rsRecv.SsrcStreamOutForIndex(strIdx).SetPayloadType(0)
     rsRecv.rtcpServiceActive = true // to simulate an active RTCP service
@@ -77,7 +77,7 @@ func rtpReceive(t *testing.T) {
     // The defined sequence number (maxDropout-1) tests one path of sequence number initialization for
     // the input stream.
     seqNum := uint16(maxDropout - 1)
-    strIdx := rsSender.NewSsrcStreamOut(&Address{senderAddr.IP, senderPort, senderPort + 1}, 0x04030201, seqNum)
+    strIdx, _ := rsSender.NewSsrcStreamOut(&Address{senderAddr.IP, senderPort, senderPort + 1}, 0x04030201, seqNum)
     strOut := rsSender.SsrcStreamOutForIndex(strIdx)
     strOut.SetPayloadType(0)
 
@@ -312,7 +312,7 @@ func rtpReceive(t *testing.T) {
     // Create a RTP "sender" stream, with defined SSRC, sequence and payload type. Define the sequence number to
     // check second if-path when initalizing the sequence number for input stream
     seqNum = uint16(maxDropout)
-    strIdx = rsSender.NewSsrcStreamOut(&Address{senderAddr.IP, senderPort, senderPort + 1}, 0x04030201, seqNum)
+    strIdx, _ = rsSender.NewSsrcStreamOut(&Address{senderAddr.IP, senderPort, senderPort + 1}, 0x04030201, seqNum)
     strOut = rsSender.SsrcStreamOutForIndex(strIdx)
     strOut.SetPayloadType(0)
 
@@ -398,7 +398,7 @@ func rtpReceive(t *testing.T) {
     // enable checks if sequence number wraps. First use a sequence number near wrap but small enough to go through
     // the initial tests
     seqNum = uint16(seqNumMod - maxMisorder - 2)
-    strIdx = rsSender.NewSsrcStreamOut(&Address{senderAddr.IP, senderPort, senderPort + 1}, 0x04030201, seqNum)
+    strIdx, _ = rsSender.NewSsrcStreamOut(&Address{senderAddr.IP, senderPort, senderPort + 1}, 0x04030201, seqNum)
     strOut = rsSender.SsrcStreamOutForIndex(strIdx)
     strOut.SetPayloadType(0)
 

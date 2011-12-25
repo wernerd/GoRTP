@@ -18,8 +18,11 @@
 
 package rtp
 
+/*
+ * This source file contains the global types, constants, methods and functions for the Session type
+ */
+
 import (
-    "crypto/rand"
     "net"
     "sync"
     "time"
@@ -28,21 +31,27 @@ import (
 // Session contols and manages the resources and actions of a RTP session.
 //
 type Session struct {
+    RtcpTransmission        // Data structure to control and manage RTCP reports.
+    MaxNumberOutStreams int // Applications may set this to increase the number of supported output streams
+    MaxNumberInStreams  int // Applications may set this to increase the number of supported input streams
+
+    dataReceiveChan DataReceiveChan
+    ctrlEventChan   CtrlEventChan
+
     streamsMapMutex sync.Mutex // synchronize activities on stream maps 
     streamsOut      streamOutMap
     streamsIn       streamInMap
     remotes         remoteMap
     conflicts       conflictMap
+
     activeSenders,
     streamOutIndex,
     streamInIndex,
     remoteIndex,
     conflictIndex uint32
-    RtcpTransmission       // Data structure to control and manage RTCP reports.
-    weSent            bool // is true if and output stream sent some RTP data
-    rtcpServiceActive bool
-    dataReceiveChan   DataReceiveChan
-    ctrlEventChan     CtrlEventChan
+
+    weSent            bool // is true if an output stream sent some RTP data
+    rtcpServiceActive bool // true if an input stream received RTP packets after last RR
     rtcpCtrlChan      rtcpCtrlChan
     transportEnd      TransportEnd
     transportEndUpper TransportEnd
@@ -58,15 +67,6 @@ type Address struct {
     DataPort, CtrlPort int
 }
 
-// Specific control event type that signal that a new input stream was created.
-// 
-// If the RTP stack receives a data or control packet for a yet unknown input stream
-// (SSRC not known) the stack creates a new input stream and signals this action to the application.
-const (
-    NewStreamData = iota // Input stream creation triggered by a RTP data packet
-    NewStreamCtrl        // Input stream creation triggered by a RTP data packet
-)
-
 // The RTP stack sends CtrlEvent to the application if it creates a new input stream or receives RTCP packets.
 //
 // A RTCP compound may contain several RTCP packets. The RTP stack creates a CtrlEvent structure for each RTCP 
@@ -75,11 +75,12 @@ const (
 // over the slice and select the events that it may process.
 //   
 type CtrlEvent struct {
-    EventType int // Either a NewStream* or a Rtcp* packet types, e.g. RtcpSR, RtcpRR, RtcpSdes, RtcpBye
-    Ssrc,     // the input stream's SSRC
-    Index uint32 // and its index
-    ByeReason string // Only for the RtcpBye packet: the resaon string if it was available, empty otherwise
+    EventType int    // Either a Stream event or a Rtcp* packet type event, e.g. RtcpSR, RtcpRR, RtcpSdes, RtcpBye
+    Ssrc      uint32 // the input stream's SSRC
+    Index     uint32 // and its index
+    Reason    string // Resaon string if it was available, empty otherwise
 }
+
 // Use a channel to signal if the transports are really closed.
 type TransportEnd chan int
 
@@ -88,23 +89,6 @@ type DataReceiveChan chan *DataPacket
 
 // Use a channel to send RTCP control events to the upper layer application.
 type CtrlEventChan chan []*CtrlEvent
-
-const (
-    DataTransportRecvStopped = 0x1
-    CtrlTransportRecvStopped = 0x2
-)
-
-const (
-    dataReceiveChanLen = 3
-    ctrlEventChanLen   = 3
-)
-
-// conflictAddr stores conflicting address detected during loop and collision check
-// It also stores the time of the latest conflict-
-type conflictAddr struct {
-    Address
-    seenAt int64
-}
 
 // RTCP values to manage RTCP transmission intervals
 type RtcpTransmission struct {
@@ -115,44 +99,35 @@ type RtcpTransmission struct {
     avrgPacketLength float64
 }
 
-type rtpError string
+// Returned in case of an error.
+type Error string
 
-func (s rtpError) Error() string {
+func (s Error) Error() string {
     return string(s)
 }
 
-// The RTCP control commands a a simple uint32: the MSB defines the command, the lower
-// 3 bytes the value for the command, if a value is necssary for the command.
-//
+// Specific control event type that signal that a new input stream was created.
+// 
+// If the RTP stack receives a data or control packet for a yet unknown input stream
+// (SSRC not known) the stack creates a new input stream and signals this action to the application.
 const (
-    rtcpCtrlCmdMask     = 0xff000000
-    rtcpStopService     = 0x01000000
-    rtcpModifyInterval  = 0x02000000 // Modify RTCP timer interval, low 3 bytes contain new tick time in ms
-    rtcpIncrementSender = 0x03000000 // a stream became an active sender, count this globally   
+    NewStreamData             = iota // Input stream creation triggered by a RTP data packet
+    NewStreamCtrl                    // Input stream creation triggered by a RTCP control packet
+    MaxNumInStreamReachedData        // Maximum number of input streams reached while receiving an RTP packet 
+    MaxNumInStreamReachedCtrl        // Maximum number of input streams reached while receiving an RTCP packet
+    WrongStreamStatusData            // Received RTP packet for an inactive stream
+    WrongStreamStatusCtrl            // Received RTCP packet for an inactive stream
+    StreamCollisionLoopData          // Detected a collision or loop processing an RTP packet
+    StreamCollisionLoopCtrl          // Detected a collision or loop processing an RTCP packet
 )
 
-// rtcpCtrlChan sends control data to the RTCP service.
-// USe this channel to send a stop service command or a modify time command to the
-// rtcpService. With this technique the rtcpService can modify its time between
-// service runs without being stopped.
-//
-type rtcpCtrlChan chan uint32
+// The receiver transports return these vaules via the TransportEnd channel when they are
+// done stopping the data or control receivers. 
+const (
+    DataTransportRecvStopped = 0x1
+    CtrlTransportRecvStopped = 0x2
+)
 
-// Manages the output SSRC streams. 
-// 
-// Refer to RFC 3550: do not use SSRC to multiplex different media types on one session. One RTP session
-// shall handle one media type only. However, a RTP session can have several SSRC output streams for the
-// same media types, for example sending video data from two or more cameras.
-// The output streams are identified with our "own" SSRCs, thus a RTP session may have several "own" SSRCs.
-type streamOutMap map[uint32]*SsrcStream
-
-// Manages the input SSRC streams.
-type streamInMap map[uint32]*SsrcStream
-
-// The remote peers.
-type remoteMap map[uint32]*Address
-
-type conflictMap map[uint32]*conflictAddr
 
 // Global Session functions.
 
@@ -164,14 +139,22 @@ type conflictMap map[uint32]*conflictAddr
 //
 func NewSession(tpw TransportWrite, tpr TransportRecv) *Session {
     rs := new(Session)
-    rs.streamsOut = make(streamOutMap, 2)
-    rs.streamsIn = make(streamInMap, 2)
+
+    // Maps grow dynamically, set size to avoid resizing in normal cases.
+    rs.streamsOut = make(streamOutMap, maxNumberOutStreams)
+    rs.streamsIn = make(streamInMap, maxNumberInStreams)
     rs.remotes = make(remoteMap, 2)
     rs.conflicts = make(conflictMap, 2)
+
+    rs.MaxNumberOutStreams = maxNumberOutStreams
+    rs.MaxNumberInStreams = maxNumberInStreams
+
     rs.transportWrite = tpw
     rs.transportRecv = tpr
+
     rs.transportEnd = make(TransportEnd, 2)
     rs.rtcpCtrlChan = make(rtcpCtrlChan, 1)
+
     tpr.SetCallUpper(rs)
     tpr.SetEndChannel(rs.transportEnd)
 
@@ -187,7 +170,7 @@ func NewSession(tpw TransportWrite, tpr TransportRecv) *Session {
 //
 func (rs *Session) AddRemote(remote *Address) (index uint32, err error) {
     if (remote.DataPort & 0x1) == 0x1 {
-        return 0, rtpError("RTP port number is not an even number")
+        return 0, Error("RTP data port number is not an even number.")
     }
     rs.remotes[rs.remoteIndex] = remote
     index = rs.remoteIndex
@@ -217,7 +200,11 @@ func (rs *Session) RemoveRemote(index uint32) {
 //                If zero then the method generates a random starting sequence number according 
 //                to RFC 3550
 //
-func (rs *Session) NewSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16) (index uint32) {
+func (rs *Session) NewSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16) (index uint32, err Error) {
+
+    if len(rs.streamsOut) > rs.MaxNumberOutStreams {
+        return 0, Error("Maximum number of output streams reached.")
+    }
     str := newSsrcStreamOut(own, ssrc, sequenceNo)
     str.streamStatus = active
 
@@ -243,7 +230,9 @@ func (rs *Session) NewSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16
 //
 func (rs *Session) StartSession() (err error) {
     err = rs.ListenOnTransports() // activate the transports
-
+    if err != nil {
+        return
+    }
     // compute first transmission interval
     if rs.RtcpSessionBandwidth == 0.0 { // If not set by application try to guess a value
         for _, str := range rs.streamsOut {
@@ -452,23 +441,25 @@ func (rs *Session) OnRecvData(rp *DataPacket) bool {
         // if not found in the input stream then create a new SSRC input stream
         if !existing {
             str = newSsrcStreamIn(&rp.fromAddr, ssrc)
+            if len(rs.streamsIn) > rs.MaxNumberInStreams {
+                rs.sendDataCtrlEvent(MaxNumInStreamReachedData, ssrc, 0)
+                rp.FreePacket()
+                rs.streamsMapMutex.Unlock()
+                return false
+            }
             rs.streamsIn[rs.streamInIndex] = str
             rs.streamInIndex++
             str.streamStatus = active
             str.statistics.initialDataTime = now // First packet arrival time.
-
-            var ctrlEvArr [1]*CtrlEvent
-            ctrlEvArr[0] = newCrtlEvent(NewStreamData, ssrc, rs.streamInIndex-1)
-            select {
-            case rs.ctrlEventChan <- ctrlEvArr[:]: // send control event
-            default:
-            }
+            rs.sendDataCtrlEvent(NewStreamData, ssrc, rs.streamInIndex-1)
         } else {
-            // Check if an existing stream is of type input stream and is active
+            // Check if an existing stream is active
             if str.streamStatus != active {
+                rs.sendDataCtrlEvent(WrongStreamStatusData, ssrc, rs.streamInIndex-1)
                 rp.FreePacket()
                 rs.streamsMapMutex.Unlock()
                 return false
+
             }
             // Test if RTCP packets had been received but this is the first data packet from this source.
             if str.DataPort == 0 {
@@ -483,6 +474,7 @@ func (rs *Session) OnRecvData(rp *DataPacket) bool {
         // TODO: also check CSRC identifiers.
         if !str.checkSsrcIncomingData(existing, rs, rp) || !str.recordReceptionData(rp, rs, now) {
             // must be discarded due to collision or loop or invalid source
+            rs.sendDataCtrlEvent(StreamCollisionLoopData, ssrc, rs.streamInIndex-1)
             rp.FreePacket()
             return false
         }
@@ -530,28 +522,29 @@ func (rs *Session) OnRecvCtrl(rp *CtrlPacket) bool {
             // Always check sender's SSRC first in case of RR or SR
             str, strIdx, existing := rs.rtcpSenderCheck(rp, offset)
             if str == nil {
-                return false
-            }
-            if !existing {
-                ctrlEvArr = append(ctrlEvArr, newCrtlEvent(NewStreamCtrl, str.Ssrc(), rs.streamInIndex-1))
-            }
-            str.statistics.lastRtcpSrTime = str.statistics.lastRtcpPacketTime
-            str.readSenderInfo(rp.toSenderInfo(rtcpHeaderLength + rtcpSsrcLength + offset))
-
-            ctrlEvArr = append(ctrlEvArr, newCrtlEvent(RtcpSR, str.Ssrc(), strIdx))
-
-            // Offset to first RR block: offset to SR + fixed Header length for SR + length of sender info
-            rrOffset := offset + rtcpHeaderLength + rtcpSsrcLength + senderInfoLen
-
-            for i := 0; i < rrCnt; i++ {
-                rr := rp.toRecvReport(rrOffset)
-                strOut, idx, exists := rs.lookupSsrcMapOut(rr.ssrc())
-                // Process Receive Reports that match own output streams (SSRC).
-                if exists {
-                    strOut.readRecvReport(rr)
-                    ctrlEvArr = append(ctrlEvArr, newCrtlEvent(RtcpRR, rr.ssrc(), idx))
+                ctrlEvArr = append(ctrlEvArr, newCrtlEvent(int(strIdx), str.Ssrc(), 0))
+            } else {
+                if !existing {
+                    ctrlEvArr = append(ctrlEvArr, newCrtlEvent(NewStreamCtrl, str.Ssrc(), rs.streamInIndex-1))
                 }
-                rrOffset += reportBlockLen
+                str.statistics.lastRtcpSrTime = str.statistics.lastRtcpPacketTime
+                str.readSenderInfo(rp.toSenderInfo(rtcpHeaderLength + rtcpSsrcLength + offset))
+
+                ctrlEvArr = append(ctrlEvArr, newCrtlEvent(RtcpSR, str.Ssrc(), strIdx))
+
+                // Offset to first RR block: offset to SR + fixed Header length for SR + length of sender info
+                rrOffset := offset + rtcpHeaderLength + rtcpSsrcLength + senderInfoLen
+
+                for i := 0; i < rrCnt; i++ {
+                    rr := rp.toRecvReport(rrOffset)
+                    strOut, idx, exists := rs.lookupSsrcMapOut(rr.ssrc())
+                    // Process Receive Reports that match own output streams (SSRC).
+                    if exists {
+                        strOut.readRecvReport(rr)
+                        ctrlEvArr = append(ctrlEvArr, newCrtlEvent(RtcpRR, rr.ssrc(), idx))
+                    }
+                    rrOffset += reportBlockLen
+                }
             }
             // Advance to the next packet in the compound.
             offset += pktLen
@@ -561,28 +554,28 @@ func (rs *Session) OnRecvCtrl(rp *CtrlPacket) bool {
                 return false
             }
             // Always check sender's SSRC first in case of RR or SR
-            str, _, existing := rs.rtcpSenderCheck(rp, offset)
+            str, strIdx, existing := rs.rtcpSenderCheck(rp, offset)
             if str == nil {
-                return false
-            }
-            if !existing {
-                ctrlEvArr = append(ctrlEvArr, newCrtlEvent(NewStreamCtrl, str.Ssrc(), rs.streamInIndex-1))
-            }
-
-            rrCnt := rp.Count(offset)
-            // Offset to first RR block: offset to RR + fixed Header length for RR
-            rrOffset := offset + rtcpHeaderLength + rtcpSsrcLength
-            for i := 0; i < rrCnt; i++ {
-                rr := rp.toRecvReport(rrOffset)
-                strOut, idx, exists := rs.lookupSsrcMapOut(rr.ssrc())
-                // Process Receive Reports that match own output streams (SSRC)
-                if exists {
-                    strOut.readRecvReport(rr)
-                    ctrlEvArr = append(ctrlEvArr, newCrtlEvent(RtcpRR, rr.ssrc(), idx))
+                ctrlEvArr = append(ctrlEvArr, newCrtlEvent(int(strIdx), str.Ssrc(), 0))
+            } else {
+                if !existing {
+                    ctrlEvArr = append(ctrlEvArr, newCrtlEvent(NewStreamCtrl, str.Ssrc(), rs.streamInIndex-1))
                 }
-                rrOffset += reportBlockLen
-            }
 
+                rrCnt := rp.Count(offset)
+                // Offset to first RR block: offset to RR + fixed Header length for RR
+                rrOffset := offset + rtcpHeaderLength + rtcpSsrcLength
+                for i := 0; i < rrCnt; i++ {
+                    rr := rp.toRecvReport(rrOffset)
+                    strOut, idx, exists := rs.lookupSsrcMapOut(rr.ssrc())
+                    // Process Receive Reports that match own output streams (SSRC)
+                    if exists {
+                        strOut.readRecvReport(rr)
+                        ctrlEvArr = append(ctrlEvArr, newCrtlEvent(RtcpRR, rr.ssrc(), idx))
+                    }
+                    rrOffset += reportBlockLen
+                }
+            }
             // Advance to the next packet in the compound.
             offset += pktLen
 
@@ -623,7 +616,7 @@ func (rs *Session) OnRecvCtrl(rp *CtrlPacket) bool {
                 // Send BYE control event only for known input streams.
                 if st, idx, ok := rs.lookupSsrcMapIn(byePkt.ssrc(0)); ok {
                     ctrlEv := newCrtlEvent(RtcpBye, byePkt.ssrc(0), idx)
-                    ctrlEv.ByeReason = byePkt.getReason(byeCnt)
+                    ctrlEv.Reason = byePkt.getReason(byeCnt)
                     ctrlEvArr = append(ctrlEvArr, ctrlEv)
                     st.streamStatus = isClosing
                 }
@@ -754,549 +747,4 @@ func (rs *Session) WriteCtrl(rp *CtrlPacket) (n int, err error) {
         }
     }
     return n, nil
-}
-
-// ******** Below this comment only local methods **********
-
-// rtcpService provides the RTCP service and sends RTCP reports at computed intervals.
-//
-func (rs *Session) rtcpService(ti, td int64) {
-
-    granularity := time.Duration(250e6) // 250 ms
-    ssrcTimeout := 5 * td
-    dataTimeout := 2 * ti
-
-    rs.rtcpServiceActive = true
-    ticker := time.NewTicker(granularity)
-    var cmd uint32
-    for cmd != rtcpStopService {
-        select {
-        case <-ticker.C:
-            now := time.Now().UnixNano()
-            if now < rs.tnext {
-                continue
-            }
-
-            var outActive, inActive int // Counts all members in active state
-            var inActiveSinceLastRR int
-
-            for idx, str := range rs.streamsIn {
-                switch str.streamStatus {
-                case active:
-                    str.streamMutex.Lock()
-                    // Manage number of active senders on input streams. 
-                    // Every time this stream receives a packet it updates the last packet time. If the input stream
-                    // did not receive a RTP packet for 2 RTCP intervals its sender status is set to false and the 
-                    // number of active senders in this session is decremented if not already zero. See chapter 6.3.5
-                    rtpDiff := now - str.statistics.lastPacketTime
-                    if str.sender {
-                        if str.dataAfterLastReport {
-                            inActiveSinceLastRR++
-                        }
-                        if rtpDiff > dataTimeout {
-                            str.sender = false
-                            if rs.activeSenders > 0 {
-                                rs.activeSenders--
-                            }
-                        }
-                    }
-                    // SSRC timeout processing: check for inactivity longer than 5*non-random interval time 
-                    // (both RTP/RTCP inactivity) chapter 6.3.5
-                    rtcpDiff := now - str.statistics.lastRtcpPacketTime
-                    if rtpDiff > rtcpDiff {
-                        rtpDiff = rtcpDiff
-                    }
-                    if rtpDiff > ssrcTimeout {
-                        delete(rs.streamsIn, idx)
-                    }
-                    str.streamMutex.Unlock()
-
-                case isClosing:
-                    str.streamStatus = isClosed
-
-                case isClosed:
-                    delete(rs.streamsOut, idx)
-                }
-            }
-
-            var rc *CtrlPacket
-            var streamForRR *SsrcStream
-            var outputSenders int
-
-            for idx, str := range rs.streamsOut {
-                switch str.streamStatus {
-                case active:
-                    outActive++
-                    streamForRR = str // remember one active stream in case there is no sending output stream
-
-                    // Manage number of active senders. Every time this stream sends a packet the output stream
-                    // sender updates the last packet time. If the output stream did not send RTP for 2 RTCP 
-                    // intervals its sender status is set to false and the number of active senders in this session
-                    // is decremented if not already zero. See chapter 6.3.8
-                    //
-                    str.streamMutex.Lock()
-                    rtpDiff := now - str.statistics.lastPacketTime
-                    if str.sender {
-                        outputSenders++
-                        if rtpDiff > dataTimeout {
-                            str.sender = false
-                            outputSenders--
-                            if rs.activeSenders > 0 {
-                                rs.activeSenders--
-                            }
-                        }
-                    }
-                    str.streamMutex.Unlock()
-                    if str.sender {
-                        if rc == nil {
-                            rc = rs.buildRtcpPkt(str, inActiveSinceLastRR)
-                        } else {
-                            rs.addSenderReport(str, rc)
-                        }
-                    }
-
-                case isClosing:
-                    str.streamStatus = isClosed
-
-                case isClosed:
-                    delete(rs.streamsOut, idx)
-                }
-            }
-            // If no active output stream is left then weSent becomes false
-            rs.weSent = outputSenders > 0
-
-            // if rc is nil then we found no sending stream and havent't build a control packet. Just use 
-            // one active output stream as proxy to create at least an RR and the proxy's SDES (RR may be 
-            // empty as well). If also no active output stream - don't create and send RTCP report. In this
-            // case the RTP stack in completey inactive.
-            if rc == nil && streamForRR != nil {
-                rc = rs.buildRtcpPkt(streamForRR, inActiveSinceLastRR)
-            }
-            if rc != nil {
-                rs.WriteCtrl(rc)
-                rs.tprev = now
-                size := float64(rc.InUse() + 20 + 8) // TODO: get real values for IP and transport from transport module
-                rs.avrgPacketLength = (1.0/16.0)*size + (15.0/16.0)*rs.avrgPacketLength
-
-                ti, td := rtcpInterval(outActive+inActive, int(rs.activeSenders), rs.RtcpSessionBandwidth,
-                    rs.avrgPacketLength, rs.weSent, false)
-                rs.tnext = ti + now
-                dataTimeout = 2 * ti
-                ssrcTimeout = 5 * td
-                rc.FreePacket()
-            }
-            outActive = 0
-            inActive = 0
-
-        case cmd = <-rs.rtcpCtrlChan:
-            switch cmd & rtcpCtrlCmdMask {
-            case rtcpStopService:
-                ticker.Stop()
-
-            case rtcpModifyInterval:
-                ticker.Stop()
-                granularity = time.Duration(cmd &^ rtcpCtrlCmdMask)
-                ticker = time.NewTicker(granularity)
-
-            case rtcpIncrementSender:
-                rs.activeSenders++
-            }
-        }
-    }
-    rs.rtcpServiceActive = false
-}
-
-// buildRtcpPkt creates an RTCP compound and fills it with a SR or RR packet.
-//
-// This method loops over the known input streams and fills in receiver reports.
-// the method adds a maximum of 31 receiver reports. The SR and/or RRs and the SDES
-// of the output stream always fit in the RTCP compund, thus no further checks required.
-//
-// Other output streams just add their sender reports and SDES info.
-//
-func (rs *Session) buildRtcpPkt(strOut *SsrcStream, inStreamCnt int) (rc *CtrlPacket) {
-
-    var pktLen, offset int
-    if strOut.sender {
-        rc, offset = strOut.newCtrlPacket(RtcpSR)
-        offset = rc.addHeaderSsrc(offset, strOut.Ssrc())
-
-        var info senderInfo
-        info, offset = rc.newSenderInfo()
-        strOut.fillSenderInfo(info) // create a sender info block after fixed header and SSRC.
-    } else {
-        rc, offset = strOut.newCtrlPacket(RtcpRR)
-        offset = rc.addHeaderSsrc(offset, strOut.Ssrc())
-    }
-    pktLen = offset/4 - 1
-    // TODO Handle round-robin if we have more then 31 really active input streams (chap 6.4)
-    if inStreamCnt >= 31 {
-        inStreamCnt = 31
-    }
-    var rrCnt int
-    if inStreamCnt > 0 {
-        for _, strIn := range rs.streamsIn {
-            if strIn.dataAfterLastReport {
-                strIn.dataAfterLastReport = false
-                strIn.makeRecvReport(rc)
-                pktLen += reportBlockLen / 4 // increment SR/RR to include length of this recv report block
-                rrCnt++
-                if inStreamCnt--; inStreamCnt <= 0 {
-                    break
-                }
-            }
-        }
-    }
-    rc.SetLength(0, uint16(pktLen)) // length of first RTCP packet in compound: fixed header, 0 or 1 SR, n*RR
-    rc.SetCount(0, rrCnt)
-
-    rs.addSdes(strOut, rc)
-
-    return
-}
-
-// buildRtcpByePkt builds an RTCP BYE compound.
-//
-func (rs *Session) buildRtcpByePkt(strOut *SsrcStream, reason string) (rc *CtrlPacket) {
-    rc = rs.buildRtcpPkt(strOut, 0)
-
-    headerOffset := rc.InUse()
-    strOut.addCtrlHeader(rc, headerOffset, RtcpBye)
-    // Here we may add a loop over CSRC (addtional data in ouput steam) and hand over to makeByeData
-    offset := strOut.makeByeData(rc, reason)
-    rc.SetCount(headerOffset, 1)                                  // currently one BYE SSRC/CSRC per packet
-    rc.SetLength(headerOffset, uint16((offset-headerOffset)/4-1)) // length of BYE packet in compound: fixed header plus BYE data
-    return
-}
-
-// addSenderReport appends a SDES packet into to control packet.
-//
-func (rs *Session) addSdes(strOut *SsrcStream, rc *CtrlPacket) {
-    offsetSdes := rc.InUse()
-    if strOut.sdesChunkLen > 0 {
-        strOut.addCtrlHeader(rc, offsetSdes, RtcpSdes) // Add a RTCP SDES packet header after the SR/RR packet
-        // makeSdesChunk returns position where to append next chunk - for CSRCs that contribute to this, chap 6.5, RFC 3550
-        // CSRCs currently not supported, need additional data structures in output stream.
-        nextChunk := strOut.makeSdesChunk(rc)
-        rc.SetCount(offsetSdes, 1)                                   // currently one SDES chunk per SDES packet
-        rc.SetLength(offsetSdes, uint16((nextChunk-offsetSdes)/4-1)) // length of SDES packet in compound: fixed header plus SDES chunk len
-    }
-}
-
-// addSenderReport appends a sender report into to control packet if the output stream is a sender.
-//
-// The method just adds the sender report for the output stream. It does not loop over the
-// input streams to fill in the sreceiver reports. Only one output stream's sender report
-// contains receiver reports of our input streams.
-//
-func (rs *Session) addSenderReport(strOut *SsrcStream, rc *CtrlPacket) {
-
-    if !strOut.sender {
-        return
-    }
-
-    headerOffset := rc.InUse()
-    if headerOffset+strOut.sdesChunkLen+8 > len(rc.Buffer()) {
-        return
-    }
-    offset := strOut.addCtrlHeader(rc, headerOffset, RtcpSR)
-    rc.addHeaderSsrc(offset, strOut.Ssrc())
-
-    var info senderInfo
-    info, offset = rc.newSenderInfo()
-    strOut.fillSenderInfo(info) // create a sender info block after fixed header and SSRC.
-
-    pktLen := (offset-headerOffset)/4 - 1
-    rc.SetLength(headerOffset, uint16(pktLen)) // length of RTCP packet in compound: fixed header, SR, 0*RR
-    rc.SetCount(headerOffset, 0)               // zero receiver reports in this SR
-
-    rs.addSdes(strOut, rc)
-}
-
-// rtcpSenderCheck is a helper function for OnRecvCtrl and checks if a sender's SSRC.
-// 
-func (rs *Session) rtcpSenderCheck(rp *CtrlPacket, offset int) (*SsrcStream, uint32, bool) {
-    ssrc := rp.Ssrc(offset) // get SSRC from control packet
-
-    rs.streamsMapMutex.Lock()
-    str, strIdx, existing := rs.lookupSsrcMap(ssrc)
-
-    // if not found in the input stream then create a new SSRC input stream
-    if !existing {
-        str = newSsrcStreamIn(&rp.fromAddr, ssrc)
-        str.streamStatus = active
-        rs.streamsIn[rs.streamInIndex] = str
-        rs.streamInIndex++
-    } else {
-        // Check if an existing stream is of type input stream and is active
-        if str.streamStatus != active {
-            rp.FreePacket()
-            rs.streamsMapMutex.Unlock()
-            return nil, 0, false
-        }
-        // Test if RTP packets had been received but this is the first control packet from this source.
-        if str.CtrlPort == 0 {
-            str.CtrlPort = rp.fromAddr.CtrlPort
-        }
-    }
-    rs.streamsMapMutex.Unlock()
-
-    // Check if sender's SSRC collides or loops 
-    if !str.checkSsrcIncomingCtrl(existing, rs, &rp.fromAddr) {
-        rp.FreePacket()
-        return nil, 0, false
-    }
-    // record reception time
-    str.statistics.lastRtcpPacketTime = time.Now().UnixNano()
-    return str, strIdx, existing
-}
-
-// lookupSsrcMap returns a SsrcStream, either a SsrcStreamIn or SsrcStreamOut for a given SSRC, nil and false if none found.
-//
-func (rs *Session) lookupSsrcMap(ssrc uint32) (str *SsrcStream, idx uint32, exists bool) {
-    if str, idx, exists = rs.lookupSsrcMapOut(ssrc); exists {
-        return
-    }
-    if str, idx, exists = rs.lookupSsrcMapIn(ssrc); exists {
-        return
-    }
-    return nil, 0, false
-}
-
-// lookupSsrcMapIn returns a SsrcStreamIn for a given SSRC, nil and false if none found.
-//
-func (rs *Session) lookupSsrcMapIn(ssrc uint32) (*SsrcStream, uint32, bool) {
-    for idx, str := range rs.streamsIn {
-        if ssrc == str.ssrc {
-            return str, idx, true
-        }
-    }
-    return nil, 0, false
-}
-
-// lookupSsrcMapOut returns a SsrcStreamOut for a given SSRC, nil and false if none found.
-//
-func (rs *Session) lookupSsrcMapOut(ssrc uint32) (*SsrcStream, uint32, bool) {
-    for idx, str := range rs.streamsOut {
-        if ssrc == str.ssrc {
-            return str, idx, true
-        }
-    }
-    return nil, 0, false
-}
-
-// isOutputSsrc checks if a given SSRC is already used in our output streams.
-// Use this functions to detect collisions.
-//
-func (rs *Session) isOutputSsrc(ssrc uint32) (found bool) {
-    var str *SsrcStream
-    for _, str = range rs.streamsOut {
-        if ssrc == str.ssrc {
-            found = true
-            break
-        }
-    }
-    return
-}
-
-// checkConflictData checks and manages entries of conflicting data addresses.
-// If an address/port pair is already recorded just update the time and return
-// the entry and true.
-//
-// If an entry was not found then create an entry, populate it and return entry
-// and false.
-//
-func (rs *Session) checkConflictData(addr *Address) (found bool) {
-    var entry *conflictAddr
-    tm := time.Now().UnixNano()
-
-    for _, entry = range rs.conflicts {
-        if addr.IpAddr.Equal(entry.IpAddr) && addr.DataPort == entry.DataPort {
-            found = true
-            entry.seenAt = tm
-            return
-        }
-    }
-    entry = new(conflictAddr)
-    entry.IpAddr = addr.IpAddr
-    entry.DataPort = addr.DataPort
-    entry.seenAt = tm
-    rs.conflicts[rs.conflictIndex] = entry
-    rs.conflictIndex++
-    found = false
-    return
-}
-
-// checkConflictData checks and manages entries of conflicting data addresses.
-// If an address/port pair is already recorded just update the time and return
-// the entry and true.
-//
-// If an entry was not found then create an entry, populate it and return entry
-// and false.
-//
-func (rs *Session) checkConflictCtrl(addr *Address) (found bool) {
-    var entry *conflictAddr
-    tm := time.Now().UnixNano()
-
-    for _, entry = range rs.conflicts {
-        if addr.IpAddr.Equal(entry.IpAddr) && addr.CtrlPort == entry.CtrlPort {
-            found = true
-            entry.seenAt = tm
-            return
-        }
-    }
-    entry = new(conflictAddr)
-    entry.IpAddr = addr.IpAddr
-    entry.CtrlPort = addr.CtrlPort
-    entry.seenAt = tm
-    rs.conflicts[rs.conflictIndex] = entry
-    rs.conflictIndex++
-    found = false
-    return
-}
-
-// processSdesChunk checks if the chunk's SSRC is already known and if yes, parse it.
-// The method returns the length of the chunk .
-//
-func (rs *Session) processSdesChunk(chunk sdesChunk, rp *CtrlPacket) (int, uint32, bool) {
-    chunkLen, ok := chunk.chunkLen()
-    if !ok {
-        return 0, 0, false
-    }
-    strIn, idx, existing := rs.lookupSsrcMapIn(chunk.ssrc())
-    if !existing {
-        return chunkLen, idx, true
-    }
-    strIn.parseSdesChunk(chunk)
-    return chunkLen, idx, true
-}
-
-// replaceStream creates a new output stream, initializes it from the old output stream and replaces the old output stream. 
-//
-// The old output stream will then become an input streamm - this handling is called if we have a conflict during
-// collision, loop detection (see algorithm in chap 8.2, RFC 3550).
-//
-func (rs *Session) replaceStream(oldOut *SsrcStream) (newOut *SsrcStream) {
-    var str *SsrcStream
-    var idx uint32
-    for idx, str = range rs.streamsOut {
-        if oldOut.ssrc == str.ssrc {
-            break
-        }
-    }
-    // get new stream and copy over attributes from old stream
-    newOut = newSsrcStreamOut(&Address{oldOut.IpAddr, oldOut.DataPort, oldOut.CtrlPort}, 0, 0)
-
-    for itemType, itemTxt := range oldOut.SdesItems {
-        newOut.SetSdesItem(itemType, itemTxt)
-    }
-    newOut.SetPayloadType(oldOut.PayloadType())
-    newOut.sender = oldOut.sender
-
-    // Now lock and re-shuffle the streams
-    rs.streamsMapMutex.Lock()
-    defer rs.streamsMapMutex.Unlock()
-
-    // Don't reuse an existing SSRC
-    for _, _, exists := rs.lookupSsrcMap(newOut.Ssrc()); exists; _, _, exists = rs.lookupSsrcMap(newOut.Ssrc()) {
-        newOut.newSsrc()
-    }
-    rs.streamsOut[idx] = newOut // replace the oldOut with a new initialized out, new SSRC, sequence but old address
-
-    // sanity check - this is a panic, something stange happened
-    for idx, str = range rs.streamsIn {
-        if oldOut.ssrc == str.ssrc {
-            panic("Panic: found input stream during collision handling - expected none")
-            return
-        }
-    }
-    rs.streamsIn[rs.streamInIndex] = oldOut
-    rs.streamInIndex++
-    return
-}
-
-// The following constants were taken from RFC 3550, chapters 6.3.1 and A.7
-const (
-    rtcpMinimumTime    = 5.0
-    rtcpSenderFraction = 0.25
-    rtcpRecvFraction   = 1.0 - rtcpSenderFraction
-    compensation       = 2.71828 - 1.5
-)
-
-// rtcpInterval helper function computes the next time when to send an RTCP packet.
-//
-// The algorithm is copied from RFC 2550, A.7 and a little bit adapted to Go. This includes some important comments :-) .
-//
-func rtcpInterval(members, senders int, rtcpBw, avrgSize float64, weSent, initial bool) (int64, int64) {
-
-    rtcpMinTime := rtcpMinimumTime
-    if initial {
-        rtcpMinTime /= 2
-    }
-
-    /*
-     * Dedicate a fraction of the RTCP bandwidth to senders unless
-     * the number of senders is large enough that their share is
-     * more than that fraction.
-     */
-    n := members
-    if senders <= int((float64(members) * rtcpSenderFraction)) {
-        if weSent {
-            rtcpBw *= rtcpSenderFraction
-            n = senders
-        } else {
-            rtcpBw *= rtcpRecvFraction
-            n -= senders
-        }
-    }
-    /*
-     * The effective number of sites times the average packet size is
-     * the total number of octets sent when each site sends a report.
-     * Dividing this by the effective bandwidth gives the time
-     * interval over which those packets must be sent in order to
-     * meet the bandwidth target, with a minimum enforced.  In that
-     * time interval we send one report so this time is also our
-     * average time between reports.
-     */
-    t := avrgSize * float64(n) / rtcpBw
-    if t < rtcpMinTime {
-        t = rtcpMinTime
-    }
-    td := int64(t * 1e9) // determinisitic interval, see chap 6.3.1, 6.3.5
-    var randBuf [2]byte
-    rand.Read(randBuf[:])
-    randNo := uint16(randBuf[0])
-    randNo |= uint16(randBuf[1]) << 8
-    randFloat := float64(randNo)/65536.0 + 0.5
-
-    t *= randFloat
-    t /= compensation
-    // return as nanoseconds
-    return int64(t * 1e9), td
-}
-
-// newCrtlEvent is a little helper function to create and initialize a new control event.
-func newCrtlEvent(eventType int, ssrc, idx uint32) (ctrlEv *CtrlEvent) {
-    ctrlEv = new(CtrlEvent)
-    ctrlEv.EventType = eventType
-    ctrlEv.Ssrc = ssrc
-    ctrlEv.Index = idx
-    return
-}
-
-// Number of seconds ellapsed from 1900 to 1970, see RFC 5905
-const ntpEpochOffset = 2208988800
-
-// toNtpStamp converts a GO time into the NTP format according to RFC 5905
-func toNtpStamp(tm int64) (seconds, fraction uint32) {
-    seconds = uint32(tm/1e9 + ntpEpochOffset) // Go uses ns, thus divide by 1e9 to get seconds
-    fraction = uint32(((tm % 1e9) << 32) / 1e9)
-    return
-}
-
-// fromNtp converts a NTP timestamp into GO time 
-func fromNtp(seconds, fraction uint32) (tm int64) {
-    n := (int64(fraction) * 1e9) >> 32
-    tm = (int64(seconds)-ntpEpochOffset)*1e9 + n
-    return
 }

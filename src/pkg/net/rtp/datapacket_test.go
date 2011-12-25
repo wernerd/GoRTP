@@ -165,7 +165,7 @@ func rtpPacket(t *testing.T) {
     // context. A RTP session can have several RTP stream for example to send several
     // streams of the same media.
     //
-    strIdx := rsLocal.NewSsrcStreamOut(&Address{local.IP, port, port+1}, 0x01020304, 0x4711)
+    strIdx, _ := rsLocal.NewSsrcStreamOut(&Address{local.IP, port, port+1}, 0x01020304, 0x4711)
     rsLocal.SsrcStreamOutForIndex(strIdx).SetPayloadType(3)
 
     // Create a RTP packet suitable for standard stream (index 0) with a payload length of 160 bytes

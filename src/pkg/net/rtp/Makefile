@@ -5,6 +5,7 @@ GOFILES= \
 	doc.go \
 	packets.go \
 	session.go \
+    sessionlocal.go \
 	stream.go \
 	payload.go \
 	transport.go \
