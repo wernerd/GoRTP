@@ -23,7 +23,7 @@ RTP some tests on _localhost_ that shows how to setup a RTP session, an
 output stream and how to send and receive RTP data and control events. Parts
 of this program are used in the package documentation.
 
-The software is tagged as V1.0.0RC1 (IMHO) and should be ready to use for
+The software is tagged as V1.0.0RC2 (IMHO) and should be ready to use for
 many RTP applications. Standard point-to-point RTP applications should not
 pose any problems. RTP multi-cast using IP multi-cast addresses is not
 supported. If somebody really requires IP multi-cast it could be added at the
