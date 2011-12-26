@@ -17,11 +17,12 @@
 //
 
 /*
-Package rtp implements the RTP/RTCP protocol and transports.  
+The GoRTP package rtp implements the RTP/RTCP protocol.
 
-This implementation of the RTP/RTCP protocol uses a set of structures to provide a high
-degree of flexibility and to adhere to the RFC 3550 notation of RTP sessions (refer
-to RFC 3550 chapter 3, RTP session) and its associated streams. 
+This Go implementation of the RTP/RTCP protocol uses a set of structures to
+provide a high degree of flexibility and to adhere to the RFC 3550 notation of
+RTP sessions (refer to RFC 3550 chapter 3, RTP session) and its associated
+streams.
 
 Figure 1 depicts the high-level layout of the data structure. This
 documentation describes the parts in some more detail.
@@ -57,8 +58,8 @@ documentation describes the parts in some more detail.
  Figure 1: Data structure in Go RTP implementation
 
 
-Figure 1 does not show the RTP / RTCP packet module which maintains support
-and managament functions to handle RTP and RTCP packet data structures.
+Figure 1 does not show the RTP / RTCP packet module that implements support
+and management functions to handle RTP and RTCP packet data structures.
 
 
 RTP data packets
@@ -79,9 +80,9 @@ which send a lot of data on long lasting RTP sessions.
 Transport Modules
 
 The Go RTP implementation uses stackable transport modules. The lowest layer
-(nearest to the real network) implement the UDP, TCP or other network
+(nearest to the real network) implements the UDP, TCP or other network
 transports. Each transport module must implement the interfaces TransportRecv
-and/or TransportWrite depending if it is a receiver oder sender module. This
+and/or TransportWrite if it acts a is a receiver oder sender module. This
 separtion of interfaces enables an asymmetric transport stack as shown in
 figure 1.
 
@@ -199,11 +200,11 @@ streams to solve collisions or loops.
 Now the output stream is ready.
 
 
-Add address of the remote application
+ Add addresses of remote application(s)
 
-A Session can hold several remote addresses and it sends RTP data and RTCP
-control to all known remote applications. To add a remote address the
-application may perform:
+A Session can hold several remote addresses and it sends RTP and RTCP packets
+to all known remote applications. To add a remote address the application may
+perform:
 
   rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1})
 
@@ -281,6 +282,48 @@ second). Such a data packet contains 160 sampling values and the application
 must increase the RTP timestamp by 160 for each packet. If an applications
 uses other payload types it has to compute and maintain the correct RTP
 timestamps and use them when it creates a new RTP data packet.
+
+Some noteable features
+
+* The current release V1.0.0 computes the RTCP intervals based on the length of
+RTCP compound packets and the bandwidth allocated to RTCP. The application may
+set the bandwidth, if no set GoRTP makes somes educated guesses.
+  
+* The application may set the maximum number of output and input streams even
+while the RTP session is active. If the application des not set GoRTP sets
+the values to 5 and 30 respectively.
+  
+* GoRTP produces SR and RR reports and the associated SDES for active streams
+only, thus it implements the activity check as defined in chapter 6.4
+
+* An appplication may use GoRTP in _simple RTP_ mode. In this mode only RTP
+data packets are exchanged between the peers. No RTCP service is active, no
+statistic counters, and GoRTP discards RTCP packets it receives.
+
+* GoRTP limits the number of RR to 31 per RTCP report interval. GoRTP does not
+add an additional RR packet in case it detects more than 31 active input
+streams. This restriction is mainly due to MTU contraints of modern Ethernet
+or DSL based networks. The MTU is usually less than 1500 bytes, GoRTP limits
+the RTP/RTCP packet size to 1200 bytes. The length of an RR is 24 bytes,
+thus 31 RR already require 774 bytes. Adding some data for SR and SDES fills
+the rest. 
+
+* An application may register to a control event channel and GoRTP delivers a
+nice set of control and error events. The events cover:
+  - Creation of a new input stream when receiving an RTP or RTCP packet and
+    the SSRC was not known
+  - RTCP events to inform about RTCP packets and received reports
+  - Error events
+
+* Currently GoRTP supports only SR, RR, SDES, and BYE RTCP packets. Inside 
+SDES GoRTP does not support SDES Private and SDES H.323 items.
+
+
+Further documentation
+
+Beside the documentation of the global methods, functions, variables and constants I
+also documented all internally used stuff. Thus if you need more information how it 
+works or if you would like to enhance GoRTP please have a look in the sources.
 
 */
 package rtp

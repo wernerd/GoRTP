@@ -16,15 +16,15 @@ necessary.
 ## How to use
 
 This is a pure RTP / RTCP stack and it does not contain any media processing,
-for example generating the payload for audio or video codecs.
+for example generating or packing the payload for audio or video codecs.
 
 The directory `src/cmd/rtpmain` contains an example Go program that performs a
-RTP full duplex test on _localhost_ that shows how to setup a RTP session, an
+RTP some tests on _localhost_ that shows how to setup a RTP session, an
 output stream and how to send and receive RTP data and control events. Parts
 of this program are used in the package documentation.
 
-The software has a good beta status (IMHO) and should be ready to use for
-smaller RTP applications. Standard point-to-point RTP applications should not
+The software is tagged as V1.0.0RC1 (IMHO) and should be ready to use for
+many RTP applications. Standard point-to-point RTP applications should not
 pose any problems. RTP multi-cast using IP multi-cast addresses is not
 supported. If somebody really requires IP multi-cast it could be added at the
 transport level.
@@ -49,20 +49,37 @@ globally visible methods and functions.
 Before you start hacking please have a look into the documentation first, in
 particular the package documentation (doc.go).
 
-## Some WARNING
+## Some noteable features
 
-Currently an application shall not use more than 31 output or input streams
-per RTP session. This restriction is not yet enforced by the software but
-overthrowing that limit will cause problems. Later versions will remove that
-restriction and will handle more streams in a convenient way.
+* The current release V1.0.0 computes the RTCP intervals based on the length of
+  RTCP compound packets and the bandwidth allocated to RTCP. The application may
+  set the bandwidth, if no set GoRTP makes somes educated guesses.
+  
+* The application may set the maximum number of output and input streams even
+  while the RTP session is active. If the application des not set GoRTP sets
+  the values to 5 and 30 respectively.
+  
+* GoRTP produces SR and RR reports and the associated SDES for active streams
+  only, thus it implements the activity check as defined in chapter 6.4
 
-The RTCP reporting currently uses a fixed timer which is set to 5
-seconds. Thus at the beginning of a session and then every 5 seconds the
-internal RTCP service computes RCTP packets and send them to the known remote
-applications. A variable timing that depends on the available bandwidth _may_
-be implemented at a later time. However, given todays bandwidth this is not a
-high priority issue. The RTCP reports contain the standard stuff like jitter
-information, lost packet counters an alike.
+* An appplication may use GoRTP in _simple RTP_ mode. In this mode only RTP
+  data packets are exchanged between the peers. No RTCP service is active, no
+  statistic counters, and GoRTP discards RTCP packets it receives.
 
-Error handling an reporting will be enhanced during the next time - interface
-and method signatures may change to include error handling :-) .
+* GoRTP limits the number of RR to 31 per RTCP report interval. GoRTP does not
+  add an additional RR packet in case it detects more than 31 active input
+  streams. This restriction is mainly due to MTU contraints of modern Ethernet
+  or DSL based networks. The MTU is usually about 1500 bytes, GoRTP limits
+  the RTP/RTCP packet size to 1200 bytes. The length of an RR is 24 bytes,
+  thus 31 RR already require 774 bytes. Adding some data for SR and SDES fills
+  the rest. 
+
+* An application may register to a control event channel and GoRTP delivers a
+  nice set of control and error events. The events cover:
+  - Creation of a new input stream when receiving an RTP or RTCP packet and
+    the SSRC was not known
+  - RTCP events to inform about RTCP packets and received reports
+  - Error events
+
+* Currently GoRTP supports only SR, RR, SDES, and BYE RTCP packets. Inside 
+SDES GoRTP does not support SDES Private and SDES H.323 items.
