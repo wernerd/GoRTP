@@ -128,7 +128,6 @@ const (
     CtrlTransportRecvStopped = 0x2
 )
 
-
 // Global Session functions.
 
 // NewSession creates a new RTP session.
@@ -260,11 +259,13 @@ func (rs *Session) StartSession() (err error) {
 // closes the receiver transports,
 //
 func (rs *Session) CloseSession() {
-    rs.rtcpCtrlChan <- rtcpStopService
-    for idx := range rs.streamsOut {
-        rs.SsrcStreamCloseForIndex(idx)
+    if rs.rtcpServiceActive {
+        rs.rtcpCtrlChan <- rtcpStopService
+        for idx := range rs.streamsOut {
+            rs.SsrcStreamCloseForIndex(idx)
+        }
+        rs.CloseRecv() // de-activate the transports
     }
-    rs.CloseRecv() // de-activate the transports
     return
 }
 

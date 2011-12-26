@@ -254,9 +254,12 @@ func fullDuplex() {
     time.Sleep(8e9)
 
     stop = true
-    time.Sleep(30e6) // allow to drain the sender
+    time.Sleep(30e6) // allow the sender to drain
+
     stopRemoteRecv <- true
     stopLocalRecv <- true
+    stopRemoteCtrl <- true
+    stopLocalCtrl <- true
 
     rsLocal.CloseSession()
     rsRemote.CloseSession()
@@ -316,9 +319,12 @@ func fullDuplexTwoStreams() {
     time.Sleep(8e9)
 
     stop = true
-    time.Sleep(30e6) // allow to drain the sender
+    time.Sleep(30e6) // allow  the sender to drain
+
     stopRemoteRecv <- true
     stopLocalRecv <- true
+    stopRemoteCtrl <- true
+    stopLocalCtrl <- true
 
     rsLocal.CloseSession()
     rsRemote.CloseSession()
@@ -328,8 +334,70 @@ func fullDuplexTwoStreams() {
     fmt.Printf("Full duplex test with 2 output streams done.")
 }
 
+func simpleRtp() {
+    fmt.Println("Starting simple RTP test.")
+
+    // Create a UDP transport with "local" address and use this for a "local" RTP session
+    // The RTP session uses the transport to receive and send RTP packets to the remote peer.
+    tpLocal, _ := rtp.NewTransportUDP(local, localPort)
+
+    // TransportUDP implements TransportWrite and TransportRecv interfaces thus
+    // use it to initialize the Session for both interfaces.
+    rsLocal = rtp.NewSession(tpLocal, tpLocal)
+
+    // Add address of a remote peer (participant)
+    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1})
+
+    // Create a media stream. 
+    // The SSRC identifies the stream. Each stream has its own sequence number and other 
+    // context. A RTP session can have several RTP stream for example to send several
+    // streams of the same media.
+    //
+    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
+    rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
+
+    // Create the same set for a "remote" peer and use the "local" as its remote peer.
+    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort)
+    rsRemote = rtp.NewSession(tpRemote, tpRemote)
+    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1})
+
+    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
+    rsRemote.SsrcStreamOutForIndex(strRemoteIdx).SetPayloadType(0)
+
+    go receivePacketLocal()
+    go receivePacketRemote()
+
+    // simple RTP: just listen on the RTP and RTCP receive transports. Do not start Session.
+    rsLocal.ListenOnTransports()
+    rsRemote.ListenOnTransports()
+
+    // Just connect to control event channel, however in simple RTP mode GoRTP does not report any events.
+    go sendLocalToRemote()
+    go sendRemoteToLocal()
+
+    time.Sleep(8e9)
+
+    stop = true
+    time.Sleep(30e6) // allow the sender to drain 
+
+    stopRemoteRecv <- true
+    stopLocalRecv <- true
+    stopRemoteCtrl <- true
+    stopLocalCtrl <- true
+
+    // Just close the receivers, no need to close a session.
+    rsLocal.CloseRecv()
+    rsRemote.CloseRecv()
+
+    time.Sleep(10e6)
+
+    fmt.Printf("Simple RTP test done.")
+
+}
+
 func main() {
     initialize()
 //    fullDuplex()
-    fullDuplexTwoStreams()
+//    fullDuplexTwoStreams()
+    simpleRtp()
 }
