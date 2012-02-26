@@ -6,28 +6,35 @@ functions.
 
 ## How to build
 
-The `rtp` package directory contains a standard Makefile. To build the package
-just run `gomake` and then `gomake install`. Use `gotest` to execute the tests
-check if the code works with the current Go installation on your system. It
-should PASS. On my system I currently use `6g version weekly.2011-12-14
-10879`. I usually update Go every two weeks or so and adapt the code if
-necessary.
+The _rtp_ sources use the GOPATH directory structure. To build, test, and run
+the software just add the main goRTP directory to GOPATH. For further
+information about this structure run `go help gopath` and follow the
+instructions. The _rtp_ package is below the package _net_ to make clear that
+_rtp_ is a network related package.
+
+To build the package just run `go build net/rtp` and then `go install
+net/rtp`. To excecute the tests just run `go test net/rtp`. The tests check if
+the code works with the current Go installation on your system. It should
+PASS.
+
+A demo program is available and is called _rtpmain_. Use `go build
+net/rtpmain` to build it. The command `go install net/rtpmain` installs it in
+the `bin` directory of the main directory.
 
 ## How to use
 
 This is a pure RTP / RTCP stack and it does not contain any media processing,
 for example generating or packing the payload for audio or video codecs.
 
-The directory `src/cmd/rtpmain` contains an example Go program that performs a
+The directory `src/net/rtpmain` contains an example Go program that performs a
 RTP some tests on _localhost_ that shows how to setup a RTP session, an
 output stream and how to send and receive RTP data and control events. Parts
 of this program are used in the package documentation.
 
-The software is tagged as V1.0.0RC2 (IMHO) and should be ready to use for
-many RTP applications. Standard point-to-point RTP applications should not
-pose any problems. RTP multi-cast using IP multi-cast addresses is not
-supported. If somebody really requires IP multi-cast it could be added at the
-transport level.
+The software should be ready to use for many RTP applications. Standard
+point-to-point RTP applications should not pose any problems. RTP multi-cast
+using IP multi-cast addresses is not supported. If somebody really requires IP
+multi-cast it could be added at the transport level.
 
 RTCP reporting works without support from application. The stack reports RTCP
 packets and if the stack created new input streams and an application may
