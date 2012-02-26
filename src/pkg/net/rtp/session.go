@@ -622,6 +622,7 @@ func (rs *Session) OnRecvCtrl(rp *CtrlPacket) bool {
                     st.streamStatus = isClosing
                 }
                 // Recompute time intervals, see chapter 6.3.4
+                // TODO: not len(rs.streamsIn) but get number of members with streamStatus == active 
                 pmembers := float64(len(rs.streamsOut) + len(rs.streamsIn))
                 members := pmembers - 1.0 // received a BYE for one input channel
                 tc := float64(time.Now().UnixNano())
