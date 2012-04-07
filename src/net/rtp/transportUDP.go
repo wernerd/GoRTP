@@ -21,6 +21,7 @@ package rtp
 import (
     "fmt"
     "net"
+    "time"
 )
 
 // RtpTransportUDP implements the interfaces RtpTransportRecv and RtpTransportWrite for RTP transports.
@@ -150,7 +151,7 @@ func (tp *TransportUDP) readDataPacket() {
     var buf [defaultBufferSize]byte
 
     tp.dataRecvStop = false
-    tp.dataConn.SetReadTimeout(20e6) // 20 ms, re-test and remove after Go issue 2116 is solved 
+    tp.dataConn.SetReadDeadline(time.Now().Add(20 * time.Millisecond)) // 20 ms, re-test and remove after Go issue 2116 is solved 
     for {
         n, addr, err := tp.dataConn.ReadFromUDP(buf[0:])
         if tp.dataRecvStop {
@@ -181,7 +182,7 @@ func (tp *TransportUDP) readCtrlPacket() {
     var buf [defaultBufferSize]byte
 
     tp.ctrlRecvStop = false
-    tp.ctrlConn.SetReadTimeout(100e6) // 100 ms, re-test and remove after Go issue 2116 is solved 
+    tp.ctrlConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond)) // 20 ms, re-test and remove after Go issue 2116 is solved 
     for {
         n, addr, err := tp.ctrlConn.ReadFromUDP(buf[0:])
         if tp.ctrlRecvStop {
