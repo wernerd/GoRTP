@@ -1,15 +1,15 @@
 // Copyright (C) 2011 Werner Dittmann
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
@@ -67,7 +67,7 @@ RTP data packets
 The Go RTP stack implementation supports the necessary methods to access and
 modify the contents and header fields of a RTP data packet. Most often
 application only deal with the payload and timestamp of RTP data
-packets. The RTP stack maintains the other fields and keeps track of them. 
+packets. The RTP stack maintains the other fields and keeps track of them.
 
 The packet module implements a leaky buffer mechanism to reduce the number of
 dynamically allocated packets. While not an absolute requirement it is advised
@@ -99,22 +99,22 @@ transport module. The following code snippet shows how this works:
 
   var localPort = 5220
   var local, _ = net.ResolveIPAddr("ip", "127.0.0.1")
-  
+
   var remotePort = 5222
   var remote, _ = net.ResolveIPAddr("ip", "127.0.0.1")
-  
+
   ...
-  
+
   // Create a UDP transport with "local" address and use this for a "local" RTP session
   // The RTP session uses the transport to receive and send RTP packets to the remote peer.
   tpLocal, _ := rtp.NewTransportUDP(local, localPort)
- 
+
   // TransportUDP implements TransportWrite and TransportRecv interfaces thus
   // use it as write and read modules for the Session.
   rsLocal = rtp.NewSession(tpLocal, tpLocal)
-  
+
   ...
-  
+
 You may have noticed that the code does not use a standard Go UDP address but
 separates the IP address and the port number. This separation makes it easier
 to implement several network transport, such as UDP or TCP. The network
@@ -240,7 +240,7 @@ would do something like
 
   go receivePacketLocal()
 
-to fire up the receiver function. 
+to fire up the receiver function.
 
 
 Start the Session and perform RTP processing
@@ -288,11 +288,11 @@ Some noteable features
 * The current release V1.0.0 computes the RTCP intervals based on the length of
 RTCP compound packets and the bandwidth allocated to RTCP. The application may
 set the bandwidth, if no set GoRTP makes somes educated guesses.
-  
+
 * The application may set the maximum number of output and input streams even
 while the RTP session is active. If the application des not set GoRTP sets
 the values to 5 and 30 respectively.
-  
+
 * GoRTP produces SR and RR reports and the associated SDES for active streams
 only, thus it implements the activity check as defined in chapter 6.4
 
@@ -306,7 +306,7 @@ streams. This restriction is mainly due to MTU contraints of modern Ethernet
 or DSL based networks. The MTU is usually less than 1500 bytes, GoRTP limits
 the RTP/RTCP packet size to 1200 bytes. The length of an RR is 24 bytes,
 thus 31 RR already require 774 bytes. Adding some data for SR and SDES fills
-the rest. 
+the rest.
 
 * An application may register to a control event channel and GoRTP delivers a
 nice set of control and error events. The events cover:
@@ -315,14 +315,14 @@ nice set of control and error events. The events cover:
   - RTCP events to inform about RTCP packets and received reports
   - Error events
 
-* Currently GoRTP supports only SR, RR, SDES, and BYE RTCP packets. Inside 
+* Currently GoRTP supports only SR, RR, SDES, and BYE RTCP packets. Inside
 SDES GoRTP does not support SDES Private and SDES H.323 items.
 
 
 Further documentation
 
 Beside the documentation of the global methods, functions, variables and constants I
-also documented all internally used stuff. Thus if you need more information how it 
+also documented all internally used stuff. Thus if you need more information how it
 works or if you would like to enhance GoRTP please have a look in the sources.
 
 */
