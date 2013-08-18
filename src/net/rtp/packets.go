@@ -46,6 +46,7 @@ const (
 
 const (
 	version2Bit  = 0x80
+	versionMask  = 0x80
 	extensionBit = 0x10
 	paddingBit   = 0x20
 	markerBit    = 0x80
@@ -427,7 +428,7 @@ func (rp *DataPacket) SetPayload(payload []byte) {
 }
 
 func (rp *DataPacket) IsValid() bool {
-	if (rp.buffer[0] & version2Bit) != version2Bit {
+	if (rp.buffer[0] & versionMask) != version2Bit {
 		return false
 	}
 	if PayloadFormatMap[int(rp.PayloadType())] == nil {
