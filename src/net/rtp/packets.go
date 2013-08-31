@@ -46,7 +46,7 @@ const (
 
 const (
 	version2Bit  = 0x80
-	versionMask  = 0x80
+	versionMask  = 0xc0
 	extensionBit = 0x10
 	paddingBit   = 0x20
 	markerBit    = 0x80
