@@ -22,8 +22,8 @@ import (
     //    "encoding/hex"
     "fmt"
     "net"
-    "net/rtp"
     "time"
+    "net/rtp"
 )
 
 var localPort = 5220
@@ -46,6 +46,9 @@ var stopRemoteCtrl chan bool
 
 var eventNamesNew = []string{"NewStreamData", "NewStreamCtrl"}
 var eventNamesRtcp = []string{"SR", "RR", "SDES", "BYE"}
+
+var localZone = ""
+var remoteZone = ""
 
 // Create a RTP packet suitable for standard stream (index 0) with a payload length of 160 bytes
 // The method initializes the RTP packet with SSRC, sequence number, and RTP version number. 
@@ -214,29 +217,29 @@ func fullDuplex() {
 
     // Create a UDP transport with "local" address and use this for a "local" RTP session
     // The RTP session uses the transport to receive and send RTP packets to the remote peer.
-    tpLocal, _ := rtp.NewTransportUDP(local, localPort)
+    tpLocal, _ := rtp.NewTransportUDP(local, localPort, localZone)
 
     // TransportUDP implements TransportWrite and TransportRecv interfaces thus
     // use it to initialize the Session for both interfaces.
     rsLocal = rtp.NewSession(tpLocal, tpLocal)
 
     // Add address of a remote peer (participant)
-    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1})
+    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1, remoteZone})
 
     // Create a media stream. 
     // The SSRC identifies the stream. Each stream has its own sequence number and other 
     // context. A RTP session can have several RTP stream for example to send several
     // streams of the same media.
     //
-    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
+    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1, localZone}, 1020304, 4711)
     rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
 
     // Create the same set for a "remote" peer and use the "local" as its remote peer
-    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort)
+    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort, remoteZone)
     rsRemote = rtp.NewSession(tpRemote, tpRemote)
-    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1})
+    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1, localZone})
 
-    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
+    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1, remoteZone}, 4030201, 815)
     rsRemote.SsrcStreamOutForIndex(strRemoteIdx).SetPayloadType(0)
 
     go receivePacketLocal()
@@ -274,33 +277,33 @@ func fullDuplexTwoStreams() {
 
     // Create a UDP transport with "local" address and use this for a "local" RTP session
     // The RTP session uses the transport to receive and send RTP packets to the remote peer.
-    tpLocal, _ := rtp.NewTransportUDP(local, localPort)
+    tpLocal, _ := rtp.NewTransportUDP(local, localPort, localZone)
 
     // TransportUDP implements TransportWrite and TransportRecv interfaces thus
     // use it to initialize the Session for both interfaces.
     rsLocal = rtp.NewSession(tpLocal, tpLocal)
 
     // Add address of a remote peer (participant)
-    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1})
+    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1, remoteZone})
 
     // Create a media stream. 
     // The SSRC identifies the stream. Each stream has its own sequence number and other 
     // context. A RTP session can have several RTP stream for example to send several
     // streams of the same media.
     //
-    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
+    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1, localZone}, 1020304, 4711)
     rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
 
     // create a second output stream
-    strLocalIdx, _ = rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 11223344, 1234)
+    strLocalIdx, _ = rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1, localZone}, 11223344, 1234)
     rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
 
     // Create the same set for a "remote" peer and use the "local" as its remote peer. Remote peer has one output stream only.
-    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort)
+    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort, remoteZone)
     rsRemote = rtp.NewSession(tpRemote, tpRemote)
-    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1})
+    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1, localZone})
 
-    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
+    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1, remoteZone}, 4030201, 815)
     rsRemote.SsrcStreamOutForIndex(strRemoteIdx).SetPayloadType(0)
 
     go receivePacketLocal()
@@ -339,29 +342,29 @@ func simpleRtp() {
 
     // Create a UDP transport with "local" address and use this for a "local" RTP session
     // The RTP session uses the transport to receive and send RTP packets to the remote peer.
-    tpLocal, _ := rtp.NewTransportUDP(local, localPort)
+    tpLocal, _ := rtp.NewTransportUDP(local, localPort, localZone)
 
     // TransportUDP implements TransportWrite and TransportRecv interfaces thus
     // use it to initialize the Session for both interfaces.
     rsLocal = rtp.NewSession(tpLocal, tpLocal)
 
     // Add address of a remote peer (participant)
-    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1})
+    rsLocal.AddRemote(&rtp.Address{remote.IP, remotePort, remotePort + 1, remoteZone})
 
     // Create a media stream. 
     // The SSRC identifies the stream. Each stream has its own sequence number and other 
     // context. A RTP session can have several RTP stream for example to send several
     // streams of the same media.
     //
-    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1}, 1020304, 4711)
+    strLocalIdx, _ := rsLocal.NewSsrcStreamOut(&rtp.Address{local.IP, localPort, localPort + 1, localZone}, 1020304, 4711)
     rsLocal.SsrcStreamOutForIndex(strLocalIdx).SetPayloadType(0)
 
     // Create the same set for a "remote" peer and use the "local" as its remote peer.
-    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort)
+    tpRemote, _ := rtp.NewTransportUDP(remote, remotePort, remoteZone)
     rsRemote = rtp.NewSession(tpRemote, tpRemote)
-    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1})
+    rsRemote.AddRemote(&rtp.Address{local.IP, localPort, localPort + 1, localZone})
 
-    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1}, 4030201, 815)
+    strRemoteIdx, _ := rsRemote.NewSsrcStreamOut(&rtp.Address{remote.IP, remotePort, remotePort + 1, remoteZone}, 4030201, 815)
     rsRemote.SsrcStreamOutForIndex(strRemoteIdx).SetPayloadType(0)
 
     go receivePacketLocal()
@@ -397,7 +400,7 @@ func simpleRtp() {
 
 func main() {
     initialize()
-//    fullDuplex()
+    fullDuplex()
 //    fullDuplexTwoStreams()
-    simpleRtp()
+//    simpleRtp()
 }

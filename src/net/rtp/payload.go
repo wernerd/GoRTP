@@ -82,7 +82,7 @@ const (
 // format numbers between 96 and 127 only.
 //
 // For example if a dynamic format uses the payload number 98 then the application 
-// may perform:
+// may perform: 
 //
 //     PayloadFormatMap[98] = &net.rtp.PayloadFormat{98, net.rtp.Audio, 41000, 2, "CD"}
 //

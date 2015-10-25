@@ -195,6 +195,7 @@ func newSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16) (so *SsrcStr
     so.IpAddr = own.IpAddr
     so.DataPort = own.DataPort
     so.CtrlPort = own.CtrlPort
+    so.Zone = own.Zone
     so.payloadType = 0xff // initialize to illegal payload type
     so.initialTime = time.Now().UnixNano()
     so.newInitialTimestamp()
@@ -401,7 +402,7 @@ func (si *SsrcStream) checkSsrcIncomingData(existingStream bool, rs *Session, rp
                 result = false // discard packet and do not flip-flop
             } else {
                 // Record who has collided so that in the future we can know if the collision repeats.
-                si.prevConflictAddr = &Address{rp.fromAddr.IpAddr, rp.fromAddr.DataPort, 0}
+                si.prevConflictAddr = &Address{rp.fromAddr.IpAddr, rp.fromAddr.DataPort, 0, rp.fromAddr.Zone}
                 // Change sync source transport address
                 si.IpAddr = rp.fromAddr.IpAddr
                 si.DataPort = rp.fromAddr.DataPort
@@ -545,7 +546,7 @@ func (si *SsrcStream) checkSsrcIncomingCtrl(existingStream bool, rs *Session, fr
                 result = false // discard packet and do not flip-flop
             } else {
                 // Record who has collided so that in the future we can know if the collision repeats.
-                si.prevConflictAddr = &Address{from.IpAddr, 0, from.CtrlPort}
+                si.prevConflictAddr = &Address{from.IpAddr, 0, from.CtrlPort, from.Zone}
                 // Change sync source transport address
                 si.IpAddr = from.IpAddr
                 si.CtrlPort = from.CtrlPort

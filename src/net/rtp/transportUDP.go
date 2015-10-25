@@ -21,7 +21,6 @@ package rtp
 import (
     "fmt"
     "net"
-    "time"
 )
 
 // RtpTransportUDP implements the interfaces RtpTransportRecv and RtpTransportWrite for RTP transports.
@@ -40,11 +39,11 @@ type TransportUDP struct {
 // port - The port number of the RTP data port. This must be an even port number.
 //        The following odd port number is the control (RTCP) port. 
 //
-func NewTransportUDP(addr *net.IPAddr, port int) (*TransportUDP, error) {
+func NewTransportUDP(addr *net.IPAddr, port int, zone string) (*TransportUDP, error) {
     tp := new(TransportUDP)
     tp.callUpper = tp
-    tp.localAddrRtp = &net.UDPAddr{addr.IP, port}
-    tp.localAddrRtcp = &net.UDPAddr{addr.IP, port + 1}
+    tp.localAddrRtp = &net.UDPAddr{addr.IP, port, zone}
+    tp.localAddrRtcp = &net.UDPAddr{addr.IP, port + 1, zone }
     return tp, nil
 }
 
@@ -102,11 +101,11 @@ func (tp *TransportUDP) CloseRecv() {
     tp.dataRecvStop = true
     tp.ctrlRecvStop = true
 
-    //    err := tp.rtpConn.Close()
-    //    if err != nil {
-    //        fmt.Printf("Close failed: %s\n", err.String())
-    //    }
-    //    tp.rtcpConn.Close()
+    err := tp.dataConn.Close()
+    if err != nil {
+        fmt.Printf("Close failed: %s\n", err.Error())
+    }
+    tp.ctrlConn.Close()
 }
 
 // setEndChannel receives and set the channel to signal back after network socket was closed and receive loop terminated. 
@@ -125,12 +124,12 @@ func (tp *TransportUDP) SetToLower(lower TransportWrite) {
 
 // WriteRtpTo implements the rtp.TransportWrite WriteRtpTo method.
 func (tp *TransportUDP) WriteDataTo(rp *DataPacket, addr *Address) (n int, err error) {
-    return tp.dataConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IpAddr, addr.DataPort})
+    return tp.dataConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IpAddr, addr.DataPort, addr.Zone})
 }
 
 // WriteRtcpTo implements the rtp.TransportWrite WriteRtcpTo method.
 func (tp *TransportUDP) WriteCtrlTo(rp *CtrlPacket, addr *Address) (n int, err error) {
-    return tp.ctrlConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IpAddr, addr.CtrlPort})
+    return tp.ctrlConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IpAddr, addr.CtrlPort, addr.Zone})
 }
 
 // CloseWrite implements the rtp.TransportWrite CloseWrite method.
@@ -152,13 +151,10 @@ func (tp *TransportUDP) readDataPacket() {
 
     tp.dataRecvStop = false
     for {
-        tp.dataConn.SetReadDeadline(time.Now().Add(20 * time.Millisecond)) // 20 ms, re-test and remove after Go issue 2116 is solved
+//        deadLineErr := tp.dataConn.SetReadDeadline(time.Now().Add(20 * time.Millisecond)) // 20 ms, re-test and remove after Go issue 2116 is solved
         n, addr, err := tp.dataConn.ReadFromUDP(buf[0:])
         if tp.dataRecvStop {
             break
-        }
-        if e, ok := err.(net.Error); ok && e.Timeout() {
-            continue
         }
         if err != nil {
             break
@@ -183,13 +179,10 @@ func (tp *TransportUDP) readCtrlPacket() {
 
     tp.ctrlRecvStop = false
     for {
-        tp.dataConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond)) // 100 ms, re-test and remove after Go issue 2116 is solved
+//        tp.dataConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond)) // 100 ms, re-test and remove after Go issue 2116 is solved
         n, addr, err := tp.ctrlConn.ReadFromUDP(buf[0:])
         if tp.ctrlRecvStop {
             break
-        }
-        if e, ok := err.(net.Error); ok && e.Timeout() {
-            continue
         }
         if err != nil {
             break

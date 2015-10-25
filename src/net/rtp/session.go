@@ -65,6 +65,7 @@ type Session struct {
 type Address struct {
     IpAddr             net.IP
     DataPort, CtrlPort int
+    Zone               string
 }
 
 // The RTP stack sends CtrlEvent to the application if it creates a new input stream or receives RTCP packets.

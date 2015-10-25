@@ -521,7 +521,7 @@ func (rs *Session) replaceStream(oldOut *SsrcStream) (newOut *SsrcStream) {
         }
     }
     // get new stream and copy over attributes from old stream
-    newOut = newSsrcStreamOut(&Address{oldOut.IpAddr, oldOut.DataPort, oldOut.CtrlPort}, 0, 0)
+    newOut = newSsrcStreamOut(&Address{oldOut.IpAddr, oldOut.DataPort, oldOut.CtrlPort, oldOut.Zone}, 0, 0)
 
     for itemType, itemTxt := range oldOut.SdesItems {
         newOut.SetSdesItem(itemType, itemTxt)
