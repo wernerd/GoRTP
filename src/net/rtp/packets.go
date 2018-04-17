@@ -667,7 +667,7 @@ func (rr recvReport) setSsrc(ssrc uint32) {
 // packetsLost returns the receiver report packets lost data as 32bit unsigned in host order.
 func (rr recvReport) packetsLost() uint32 {
     lost := binary.BigEndian.Uint32(rr[4:])
-    return lost >> 8
+    return lost & 0xffffff
 }
 
 // setPacketsLost takes a 32 unsigned packet lost number in host order and sets lower 24 bits in network order in RR. 
