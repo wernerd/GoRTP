@@ -524,7 +524,12 @@ func (rs *Session) OnRecvCtrl(rp *CtrlPacket) bool {
             // Always check sender's SSRC first in case of RR or SR
             str, strIdx, existing := rs.rtcpSenderCheck(rp, offset)
             if str == nil {
-                ctrlEvArr = append(ctrlEvArr, newCrtlEvent(int(strIdx), str.Ssrc(), 0))
+                // Below commented line was causing segmentation-fault. Calling str.Ssrc() for nil str
+                // Probably because of out-of-order coming UDP packets like receiving RTCP packets for already closed streams.
+                // So I preferred to discard such RTCP packets. --LS
+                rp.FreePacket()
+                return false
+                //ctrlEvArr = append(ctrlEvArr, newCrtlEvent(int(strIdx), str.Ssrc(), 0))
             } else {
                 if !existing {
                     ctrlEvArr = append(ctrlEvArr, newCrtlEvent(NewStreamCtrl, str.Ssrc(), rs.streamInIndex-1))
@@ -556,9 +561,14 @@ func (rs *Session) OnRecvCtrl(rp *CtrlPacket) bool {
                 return false
             }
             // Always check sender's SSRC first in case of RR or SR
-            str, strIdx, existing := rs.rtcpSenderCheck(rp, offset)
+            str, _, existing := rs.rtcpSenderCheck(rp, offset)
             if str == nil {
-                ctrlEvArr = append(ctrlEvArr, newCrtlEvent(int(strIdx), str.Ssrc(), 0))
+                // Below commented line was causing segmentation-fault. Calling str.Ssrc() for nil str
+                // Probably because of out-of-order coming UDP packets like receiving RTCP packets for already closed streams.
+                // So I preferred to discard such RTCP packets. --LS
+                rp.FreePacket()
+                return false
+                //ctrlEvArr = append(ctrlEvArr, newCrtlEvent(int(strIdx), str.Ssrc(), 0))
             } else {
                 if !existing {
                     ctrlEvArr = append(ctrlEvArr, newCrtlEvent(NewStreamCtrl, str.Ssrc(), rs.streamInIndex-1))
