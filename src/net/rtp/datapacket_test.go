@@ -19,6 +19,7 @@
 package rtp
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"net"
@@ -351,4 +352,37 @@ func TestRtpPacket(t *testing.T) {
 	rtpPacket(t)
 	ntpCheck(t)
 	//    intervalCheck(t)
+}
+
+func assertEqual(t *testing.T, lhs, rhs interface{}, message string) {
+	if lhs != rhs {
+		t.Errorf("%s: %v != %v", message, lhs, rhs)
+		t.FailNow()
+	}
+}
+
+func assertBytesEqual(t *testing.T, lhs, rhs []byte, message string) {
+	if !bytes.Equal(lhs, rhs) {
+		t.Errorf("%s: %v != %v", message, lhs, rhs)
+		t.FailNow()
+	}
+}
+
+func TestCloneDataPacket(t *testing.T) {
+	packet := newTestDataPacket()
+	packet.SetPayload([]byte{1, 2, 3, 4})
+	clone := packet.Clone()
+
+	assertEqual(t, clone.IsValid(), packet.IsValid(), "clone is invalid")
+	assertEqual(t, clone.Padding(), packet.Padding(), "paddings mismatch")
+	assertEqual(t, clone.Marker(), packet.Marker(), "marker mismatch")
+	assertEqual(t, clone.CsrcCount(), packet.CsrcCount(), "ssrc count mismatch")
+	assertEqual(t, clone.Sequence(), packet.Sequence(), "sequence mismatch")
+	assertBytesEqual(t, clone.Extension(), packet.Extension(), "extension mismatch")
+	assertBytesEqual(t, clone.Payload(), packet.Payload(), "extension mismatch")
+
+	packet.FreePacket()
+	assertEqual(t, packet.IsValid(), false, fmt.Sprintf("packet %+v should not be valid", packet))
+	assertEqual(t, clone.IsValid(), true, fmt.Sprintf("packet %+v should be valid", packet))
+	assertBytesEqual(t, clone.Payload(), []byte{1, 2, 3, 4}, "extension mismatch")
 }
