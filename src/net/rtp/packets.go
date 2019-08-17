@@ -163,6 +163,22 @@ func (rp *DataPacket) FreePacket() {
 	}
 }
 
+// Clone returns an exact clone of the original packet
+func (rp *DataPacket) Clone() *DataPacket {
+	clone := &DataPacket{
+		RawPacket: RawPacket{
+			inUse:    rp.InUse(),
+			padTo:    rp.padTo,
+			isFree:   rp.isFree,
+			fromAddr: rp.fromAddr,
+			buffer:   make([]byte, len(rp.buffer), cap(rp.buffer)),
+		},
+		payloadLength: rp.payloadLength,
+	}
+	copy(clone.buffer, rp.buffer)
+	return clone
+}
+
 // CsrcCount return the number of CSRC values in this packet
 func (rp *DataPacket) CsrcCount() uint8 {
 	return rp.buffer[0] & ccMask
