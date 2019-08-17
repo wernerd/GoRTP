@@ -83,7 +83,7 @@ func csrcTest(rp *DataPacket, t *testing.T, csrc []uint32, run int) (result bool
 	csrcTmp := rp.CsrcList()
 	for i, v := range csrcTmp {
 		if v != csrc[i] {
-			t.Error(fmt.Sprintf("CSRC-%d check failed at %i. Expected: %x, got: %x\n", run, i, csrc[i], csrcTmp[i]))
+			t.Error(fmt.Sprintf("CSRC-%d check failed at %d. Expected: %x, got: %x\n", run, i, csrc[i], csrcTmp[i]))
 			return
 		}
 	}
@@ -96,7 +96,7 @@ func csrcTest(rp *DataPacket, t *testing.T, csrc []uint32, run int) (result bool
 	pay := rp.Payload()
 	for i, v := range payload {
 		if v != pay[i] {
-			t.Error(fmt.Sprintf("Payload-CSRC-%d check failed at %i. Expected: %x, got: %x\n", run, i, payload[i], pay[i]))
+			t.Error(fmt.Sprintf("Payload-CSRC-%d check failed at %d. Expected: %x, got: %x\n", run, i, payload[i], pay[i]))
 			return
 		}
 	}
@@ -122,7 +122,7 @@ func extTest(rp *DataPacket, t *testing.T, ext []byte, run int) (result bool) {
 	extTmp := rp.Extension()
 	for i, v := range extTmp {
 		if v != ext[i] {
-			t.Error(fmt.Sprintf("EXT-%d check failed at %i. Expected: %x, got: %x\n", run, i, ext[i], extTmp[i]))
+			t.Error(fmt.Sprintf("EXT-%d check failed at %d. Expected: %x, got: %x\n", run, i, ext[i], extTmp[i]))
 			return
 		}
 	}
@@ -135,7 +135,7 @@ func extTest(rp *DataPacket, t *testing.T, ext []byte, run int) (result bool) {
 	pay := rp.Payload()
 	for i, v := range payload {
 		if v != pay[i] {
-			t.Error(fmt.Sprintf("Payload-EXT-%d check failed at %i. Expected: %x, got: %x\n", run, i, payload[i], pay[i]))
+			t.Error(fmt.Sprintf("Payload-EXT-%d check failed at %d. Expected: %x, got: %x\n", run, i, payload[i], pay[i]))
 			return
 		}
 	}
@@ -202,7 +202,7 @@ func rtpPacket(t *testing.T) {
 	}
 	for i, v := range payload {
 		if v != pay[i] {
-			t.Error(fmt.Sprintf("Payload check failed at %i. Expected: %x, got: %x\n", i, payload[i], pay[i]))
+			t.Error(fmt.Sprintf("Payload check failed at %d. Expected: %x, got: %x\n", i, payload[i], pay[i]))
 			return
 		}
 	}
@@ -254,7 +254,7 @@ func rtpPacket(t *testing.T) {
 	}
 	for i, v := range payload {
 		if v != pay[i] {
-			t.Error(fmt.Sprintf("Payload check failed at %i. Expected: %x, got: %x\n", i, payload[i], pay[i]))
+			t.Error(fmt.Sprintf("Payload check failed at %d. Expected: %x, got: %x\n", i, payload[i], pay[i]))
 			return
 		}
 	}
