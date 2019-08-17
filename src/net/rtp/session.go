@@ -319,6 +319,9 @@ func (rs *Session) CreateDataReceiveChan() DataReceiveChan {
 // The receiver discards all received packets.
 //
 func (rs *Session) RemoveDataReceiveChan() {
+	if rs.dataReceiveChan != nil {
+		close(rs.dataReceiveChan)
+	}
 	rs.dataReceiveChan = nil
 }
 
