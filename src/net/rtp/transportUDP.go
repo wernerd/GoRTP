@@ -19,9 +19,19 @@
 package rtp
 
 import (
+	"bytes"
 	"fmt"
 	"net"
+	"sync"
 )
+
+var transportUDPBufPool *sync.Pool = &sync.Pool{
+	New: func() interface{} {
+		buf := &bytes.Buffer{}
+		buf.Grow(bufferSize)
+		return buf
+	},
+}
 
 // RtpTransportUDP implements the interfaces RtpTransportRecv and RtpTransportWrite for RTP transports.
 type TransportUDP struct {
@@ -147,12 +157,16 @@ func (tp *TransportUDP) CloseWrite() {
 // if callback is not nil
 
 func (tp *TransportUDP) readDataPacket() {
-	var buf [defaultBufferSize]byte
+	buffer := transportUDPBufPool.Get().(*bytes.Buffer)
+	defer transportUDPBufPool.Put(buffer)
 
 	tp.dataRecvStop = false
 	for {
+		buffer.Reset()
+		buf := buffer.Bytes()
+
 		//        deadLineErr := tp.dataConn.SetReadDeadline(time.Now().Add(20 * time.Millisecond)) // 20 ms, re-test and remove after Go issue 2116 is solved
-		n, addr, err := tp.dataConn.ReadFromUDP(buf[0:])
+		n, addr, err := tp.dataConn.ReadFromUDP(buf)
 		if tp.dataRecvStop {
 			break
 		}
@@ -175,12 +189,16 @@ func (tp *TransportUDP) readDataPacket() {
 }
 
 func (tp *TransportUDP) readCtrlPacket() {
-	var buf [defaultBufferSize]byte
+	buffer := transportUDPBufPool.Get().(*bytes.Buffer)
+	defer transportUDPBufPool.Put(buffer)
 
 	tp.ctrlRecvStop = false
 	for {
+		buffer.Reset()
+		buf := buffer.Bytes()
+
 		//        tp.dataConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond)) // 100 ms, re-test and remove after Go issue 2116 is solved
-		n, addr, err := tp.ctrlConn.ReadFromUDP(buf[0:])
+		n, addr, err := tp.ctrlConn.ReadFromUDP(buf)
 		if tp.ctrlRecvStop {
 			break
 		}

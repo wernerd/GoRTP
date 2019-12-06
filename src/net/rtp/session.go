@@ -757,11 +757,15 @@ func (rs *Session) WriteData(rp *DataPacket) (n int, err error) {
 
 	// Check here if SRTP is enabled for the SSRC of the packet - a stream attribute
 	for _, remote := range rs.remotes {
-		_, err := rs.transportWrite.WriteDataTo(rp, remote)
+		written, err := rs.transportWrite.WriteDataTo(rp, remote)
+
 		if err != nil {
 			return 0, err
 		}
+
+		n = written
 	}
+
 	return n, nil
 }
 

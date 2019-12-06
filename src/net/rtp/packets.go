@@ -92,7 +92,12 @@ const (
 
 // nullArray is what it's names says: a long array filled with zeros.
 // used to clear (fill with zeros) arrays/slices inside a buffer by copying.
-var nullArray [1200]byte
+var nullArray = make([]byte, bufferSize)
+
+var bufferSize int = defaultBufferSize
+
+// SetBufferSize sets buffer size
+func SetBufferSize(v int) { bufferSize = v }
 
 // RawPacket is plain buffer with some metadata
 type RawPacket struct {
@@ -159,7 +164,7 @@ func newDataPacket() (rp *DataPacket) {
 	case rp = <-freeListRtp: // Got one; nothing more to do.
 	default:
 		rp = new(DataPacket) // None free, so allocate a new one.
-		rp.buffer = make([]byte, defaultBufferSize)
+		rp.buffer = make([]byte, bufferSize)
 	}
 	rp.buffer[0] = version2Bit // RTP: V = 2, P, X, CC = 0
 	rp.inUse = rtpHeaderLength
@@ -522,7 +527,7 @@ func newCtrlPacket() (rp *CtrlPacket, offset int) {
 	case rp = <-freeListRtcp: // Got one; nothing more to do.
 	default:
 		rp = new(CtrlPacket) // None free, so allocate a new one.
-		rp.buffer = make([]byte, defaultBufferSize)
+		rp.buffer = make([]byte, bufferSize)
 	}
 	rp.buffer[0] = version2Bit // RTCP: V = 2, P, RC = 0
 	rp.inUse = rtcpHeaderLength
