@@ -259,7 +259,7 @@ func rtpReceive(t *testing.T) {
 
 	rcSender.fromAddr.IPAddr = senderAddr.IP
 	rcSender.fromAddr.DataPort = 0
-	rcSender.fromAddr.CtrlPort = senderPort + 3 // just to avoid an addtional conflict - but collosion will happen
+	rcSender.fromAddr.CtrlPort = senderPort + 3 // just to avoid an additional conflict - but collosion will happen
 
 	// ***    fmt.Printf("2nd Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
 	rcTotalLength = rcSender.InUse()

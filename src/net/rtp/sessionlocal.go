@@ -281,7 +281,7 @@ func (rs *Session) buildRtcpByePkt(strOut *SsrcStream, reason string) (rc *CtrlP
 
 	headerOffset := rc.InUse()
 	strOut.addCtrlHeader(rc, headerOffset, RtcpBye)
-	// Here we may add a loop over CSRC (addtional data in ouput steam) and hand over to makeByeData
+	// Here we may add a loop over CSRC (additional data in ouput steam) and hand over to makeByeData
 	offset := strOut.makeByeData(rc, reason)
 	rc.SetCount(headerOffset, 1)                                  // currently one BYE SSRC/CSRC per packet
 	rc.SetLength(headerOffset, uint16((offset-headerOffset)/4-1)) // length of BYE packet in compound: fixed header plus BYE data
