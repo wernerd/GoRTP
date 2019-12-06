@@ -94,6 +94,7 @@ const (
 // used to clear (fill with zeros) arrays/slices inside a buffer by copying.
 var nullArray [1200]byte
 
+// RawPacket is plain buffer with some metadata
 type RawPacket struct {
 	inUse    int
 	padTo    int
@@ -107,8 +108,8 @@ type RawPacket struct {
 // or decrypt the buffer.
 // Always call Buffer() just before the the buffer is actually used because several packet
 // handling functions may re-allocate buffers.
-func (raw *RawPacket) Buffer() []byte {
-	return raw.buffer
+func (rp *RawPacket) Buffer() []byte {
+	return rp.buffer
 }
 
 // InUse returns the number of valid bytes in the packet buffer.
@@ -121,7 +122,7 @@ func (rp *RawPacket) InUse() int {
 
 // *** RTP specific functions start here ***
 
-// RTP packet type to define RTP specific functions
+// DataPacket RTP packet type to define RTP specific functions
 type DataPacket struct {
 	RawPacket
 	payloadLength int16
@@ -140,6 +141,7 @@ func newDataPacket() (rp *DataPacket) {
 	rp.buffer[0] = version2Bit // RTP: V = 2, P, X, CC = 0
 	rp.inUse = rtpHeaderLength
 	rp.isFree = false
+
 	return
 }
 
@@ -150,11 +152,12 @@ func (rp *DataPacket) FreePacket() {
 	if rp.isFree {
 		return
 	}
+
 	rp.buffer[0] = 0 // invalidate RTP packet
 	rp.inUse = 0
 	rp.padTo = 0
 	rp.fromAddr.DataPort = 0
-	rp.fromAddr.IpAddr = nil
+	rp.fromAddr.IPAddr = nil
 	rp.isFree = true
 
 	select {
@@ -188,7 +191,6 @@ func (rp *DataPacket) CsrcCount() uint8 {
 // The new CSRC list replaces an existing CSCR list. The list can have a maximum length of 16 CSCR values,
 // if the list contains more values the method leaves the RTP packet untouched.
 func (rp *DataPacket) SetCsrcList(csrc []uint32) {
-
 	if len(csrc) > 16 {
 		return
 	}
@@ -403,7 +405,6 @@ func (rp *DataPacket) Payload() []byte {
 // in SetPadding. SetPayload performs padding only if the payload length is greate zero. A payload of
 // zero length removes an existing payload including a possible padding
 func (rp *DataPacket) SetPayload(payload []byte) {
-
 	payOffset := int(rp.CsrcCount()*4+rtpHeaderLength) + rp.ExtensionLength()
 	payloadLenOld := rp.inUse - payOffset
 
@@ -439,7 +440,6 @@ func (rp *DataPacket) SetPayload(payload []byte) {
 		rp.buffer[padOffset] = byte(pad)
 		rp.inUse += pad
 	}
-	return
 }
 
 func (rp *DataPacket) IsValid() bool {
@@ -485,7 +485,7 @@ func (rp *DataPacket) Print(label string) {
 
 // *** RTCP specific funtions start here ***
 
-// RTCP packet type to define RTCP specific functions.
+// CtrlPacket is RTCP packet type to define RTCP specific functions.
 type CtrlPacket struct {
 	RawPacket
 }
@@ -494,7 +494,6 @@ var freeListRtcp = make(chan *CtrlPacket, freeListLengthRtcp)
 
 // newCtrlPacket gets a raw packet, initializes the first fixed RTCP header, advances inUse to point after new fixed header.
 func newCtrlPacket() (rp *CtrlPacket, offset int) {
-
 	// Grab a packet if available; allocate if not.
 	select {
 	case rp = <-freeListRtcp: // Got one; nothing more to do.
@@ -530,7 +529,7 @@ func (rp *CtrlPacket) FreePacket() {
 	rp.inUse = 0
 	rp.padTo = 0
 	rp.fromAddr.CtrlPort = 0
-	rp.fromAddr.IpAddr = nil
+	rp.fromAddr.IPAddr = nil
 	rp.isFree = true
 
 	select {
@@ -600,6 +599,7 @@ func (rp *CtrlPacket) newSenderInfo() (info senderInfo, offset int) {
 	info = rp.toSenderInfo(rp.inUse)
 	rp.inUse += len(info)
 	offset = rp.inUse
+
 	return
 }
 
@@ -613,6 +613,7 @@ func (rp *CtrlPacket) toSenderInfo(offset int) senderInfo {
 func (in senderInfo) ntpTimeStamp() (seconds, fraction uint32) {
 	seconds = binary.BigEndian.Uint32(in[0:])
 	fraction = binary.BigEndian.Uint32(in[4:])
+
 	return
 }
 
@@ -798,27 +799,30 @@ func (sdes sdesChunk) getItemText(itemOffset, length int) string {
 	return string(sdes[itemOffset+2 : itemOffset+2+length])
 }
 
-func (sc sdesChunk) chunkLen() (int, bool) {
-
+func (sdes sdesChunk) chunkLen() (int, bool) {
 	// length is at least: SSRC plus SdesEnd byte
-	if 4+1 > len(sc) {
+	if 4+1 > len(sdes) {
 		return 0, false
 	}
+
 	length := 4 // include SSRC field of this chunk
-	itemType := sc[length]
+	itemType := sdes[length]
+
 	if itemType == SdesEnd { // Cover case if chunk has zero items
-		if 4+4 > len(sc) { // SSRC (4 byte), SdesEnd (1 byte) plus 3 bytes padding
+		if 4+4 > len(sdes) { // SSRC (4 byte), SdesEnd (1 byte) plus 3 bytes padding
 			return 0, false
 		}
+
 		return 8, true
 	}
 	// Loop over valid items and add their overall length to offset.
-	for ; itemType != SdesEnd; itemType = sc[length] {
-		length += int(sc[length+1]) + 2 // lenght points to next item type field
-		if length > len(sc) {
+	for ; itemType != SdesEnd; itemType = sdes[length] {
+		length += int(sdes[length+1]) + 2 // lenght points to next item type field
+		if length > len(sdes) {
 			return 0, false
 		}
 	}
+
 	return (length + 4) &^ 0x3, true
 }
 

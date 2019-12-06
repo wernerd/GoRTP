@@ -40,7 +40,7 @@ func createRecvSession() *Session {
 	return rsRecv
 }
 
-func sendTestPacket(s *Session) {
+func sendTestPacket(*Session) {
 	payload := make([]byte, 160)
 
 	rp := rsRecv.NewDataPacket(160)

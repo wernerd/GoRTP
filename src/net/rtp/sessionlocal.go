@@ -447,14 +447,14 @@ func (rs *Session) checkConflictData(addr *Address) (found bool) {
 	tm := time.Now().UnixNano()
 
 	for _, entry = range rs.conflicts {
-		if addr.IpAddr.Equal(entry.IpAddr) && addr.DataPort == entry.DataPort {
+		if addr.IPAddr.Equal(entry.IPAddr) && addr.DataPort == entry.DataPort {
 			found = true
 			entry.seenAt = tm
 			return
 		}
 	}
 	entry = new(conflictAddr)
-	entry.IpAddr = addr.IpAddr
+	entry.IPAddr = addr.IPAddr
 	entry.DataPort = addr.DataPort
 	entry.seenAt = tm
 	rs.conflicts[rs.conflictIndex] = entry
@@ -475,14 +475,14 @@ func (rs *Session) checkConflictCtrl(addr *Address) (found bool) {
 	tm := time.Now().UnixNano()
 
 	for _, entry = range rs.conflicts {
-		if addr.IpAddr.Equal(entry.IpAddr) && addr.CtrlPort == entry.CtrlPort {
+		if addr.IPAddr.Equal(entry.IPAddr) && addr.CtrlPort == entry.CtrlPort {
 			found = true
 			entry.seenAt = tm
 			return
 		}
 	}
 	entry = new(conflictAddr)
-	entry.IpAddr = addr.IpAddr
+	entry.IPAddr = addr.IPAddr
 	entry.CtrlPort = addr.CtrlPort
 	entry.seenAt = tm
 	rs.conflicts[rs.conflictIndex] = entry
@@ -521,7 +521,7 @@ func (rs *Session) replaceStream(oldOut *SsrcStream) (newOut *SsrcStream) {
 		}
 	}
 	// get new stream and copy over attributes from old stream
-	newOut = newSsrcStreamOut(&Address{oldOut.IpAddr, oldOut.DataPort, oldOut.CtrlPort, oldOut.Zone}, 0, 0)
+	newOut = newSsrcStreamOut(&Address{oldOut.IPAddr, oldOut.DataPort, oldOut.CtrlPort, oldOut.Zone}, 0, 0)
 
 	for itemType, itemTxt := range oldOut.SdesItems {
 		newOut.SetSdesItem(itemType, itemTxt)

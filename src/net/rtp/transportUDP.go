@@ -124,12 +124,12 @@ func (tp *TransportUDP) SetToLower(lower TransportWrite) {
 
 // WriteRtpTo implements the rtp.TransportWrite WriteRtpTo method.
 func (tp *TransportUDP) WriteDataTo(rp *DataPacket, addr *Address) (n int, err error) {
-	return tp.dataConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IpAddr, addr.DataPort, addr.Zone})
+	return tp.dataConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IPAddr, addr.DataPort, addr.Zone})
 }
 
 // WriteRtcpTo implements the rtp.TransportWrite WriteRtcpTo method.
 func (tp *TransportUDP) WriteCtrlTo(rp *CtrlPacket, addr *Address) (n int, err error) {
-	return tp.ctrlConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IpAddr, addr.CtrlPort, addr.Zone})
+	return tp.ctrlConn.WriteToUDP(rp.buffer[0:rp.inUse], &net.UDPAddr{addr.IPAddr, addr.CtrlPort, addr.Zone})
 }
 
 // CloseWrite implements the rtp.TransportWrite CloseWrite method.
@@ -160,7 +160,7 @@ func (tp *TransportUDP) readDataPacket() {
 			break
 		}
 		rp := newDataPacket()
-		rp.fromAddr.IpAddr = addr.IP
+		rp.fromAddr.IPAddr = addr.IP
 		rp.fromAddr.DataPort = addr.Port
 		rp.fromAddr.CtrlPort = 0
 		rp.inUse = n
@@ -188,7 +188,7 @@ func (tp *TransportUDP) readCtrlPacket() {
 			break
 		}
 		rp, _ := newCtrlPacket()
-		rp.fromAddr.IpAddr = addr.IP
+		rp.fromAddr.IPAddr = addr.IP
 		rp.fromAddr.CtrlPort = addr.Port
 		rp.fromAddr.DataPort = 0
 		rp.inUse = n

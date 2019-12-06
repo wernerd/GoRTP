@@ -36,15 +36,15 @@ var payloadNull = []byte{}
 var initialPacket = []byte{0x80, 0x03, 0x47, 0x11, 0xf0, 0xe0, 0xd0, 0xc0, 0x01, 0x02, 0x03, 0x04,
 	0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20}
 
-var csrc_1 = []uint32{0x21435465, 0x65544322}
-var csrc_2 = []uint32{0x23445566, 0x66554423, 0x87766554}
-var csrc_3 = []uint32{}
+var csrc1 = []uint32{0x21435465, 0x65544322}
+var csrc2 = []uint32{0x23445566, 0x66554423, 0x87766554}
+var csrc3 = []uint32{}
 
 //                 profile ID     length
-var ext_1 = []byte{0x77, 0x88, 0x00, 0x02, 0x01, 0x02, 0x03, 0x04, 0x04, 0x03, 0x02, 0x01}                         // len: 12
-var ext_2 = []byte{0x77, 0x89, 0x00, 0x03, 0x01, 0x02, 0x03, 0x04, 0x04, 0x03, 0x02, 0x01, 0x11, 0x22, 0x33, 0x44} // len: 16
-var ext_3 = []byte{0x77, 0x8a, 0x00, 0x00}                                                                         // len: 4
-var ext_4 = []byte{}
+var ext1 = []byte{0x77, 0x88, 0x00, 0x02, 0x01, 0x02, 0x03, 0x04, 0x04, 0x03, 0x02, 0x01}                         // len: 12
+var ext2 = []byte{0x77, 0x89, 0x00, 0x03, 0x01, 0x02, 0x03, 0x04, 0x04, 0x03, 0x02, 0x01, 0x11, 0x22, 0x33, 0x44} // len: 16
+var ext3 = []byte{0x77, 0x8a, 0x00, 0x00}                                                                         // len: 4
+var ext4 = []byte{}
 
 func headerCheck(rp *DataPacket, t *testing.T) (result bool) {
 	result = false
@@ -275,7 +275,7 @@ func rtpPacket(t *testing.T) {
 	rp.SetPayload(payload)
 
 	// Now check CSRC list handling. These modify InUse and shift the payload inside the packet buffer.
-	if !csrcTest(rp, t, csrc_1, 1) || !csrcTest(rp, t, csrc_2, 2) || !csrcTest(rp, t, csrc_3, 3) {
+	if !csrcTest(rp, t, csrc1, 1) || !csrcTest(rp, t, csrc2, 2) || !csrcTest(rp, t, csrc3, 3) {
 		return
 	}
 	// After last CSCR test the packet shall be in initial state, check it.
@@ -291,7 +291,7 @@ func rtpPacket(t *testing.T) {
 			return
 		}
 	}
-	if !extTest(rp, t, ext_1, 1) || !extTest(rp, t, ext_2, 2) || !extTest(rp, t, ext_3, 3) || !extTest(rp, t, ext_4, 4) {
+	if !extTest(rp, t, ext1, 1) || !extTest(rp, t, ext2, 2) || !extTest(rp, t, ext3, 3) || !extTest(rp, t, ext4, 4) {
 		return
 	}
 	// After last EXT test the packet shall be in initial state, check it.
@@ -307,14 +307,14 @@ func rtpPacket(t *testing.T) {
 			return
 		}
 	}
-	if !csrcTest(rp, t, csrc_1, 1) || !extTest(rp, t, ext_1, 1) {
+	if !csrcTest(rp, t, csrc1, 1) || !extTest(rp, t, ext1, 1) {
 		return
 	}
 	if *verbose {
 		rp.Print("CSCR/EXT combined")
 	}
 	use = rp.InUse()
-	expected := rtpHeaderLength + len(payload) + len(csrc_1)*4 + len(ext_1)
+	expected := rtpHeaderLength + len(payload) + len(csrc1)*4 + len(ext1)
 	if use != expected {
 		t.Error(fmt.Sprintf("Packet length check afer CSRC/EXT failed. Expected: %d, got: %d\n", expected, use))
 		return
