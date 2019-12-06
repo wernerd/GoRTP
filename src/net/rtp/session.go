@@ -57,6 +57,9 @@ type Session struct {
 	transportEndUpper TransportEnd
 	transportWrite    TransportWrite
 	transportRecv     TransportRecv
+
+	dataReceiveChanLen int
+	ctrlEventChanLen   int
 }
 
 // Remote stores a remote addess in a transport independent way.
@@ -131,23 +134,52 @@ const (
 
 // Global Session functions.
 
+// SessionArg is Session functional argument type
+type SessionArg func(*Session)
+
+// SessionDataReceiveChanLen is dataReceiveChanLen functional argument
+func SessionDataReceiveChanLen(v int) SessionArg {
+	return func(s *Session) { s.dataReceiveChanLen = v }
+}
+
+// SessionCtrlEventChanLen is ctrlEventChanLen functional argument
+func SessionCtrlEventChanLen(v int) SessionArg {
+	return func(s *Session) { s.ctrlEventChanLen = v }
+}
+
+// SessionMaxNumberOutStreams is MaxNumberOutStreams functional argument
+func SessionMaxNumberOutStreams(v int) SessionArg {
+	return func(s *Session) { s.MaxNumberOutStreams = v }
+}
+
+// SessionMaxNumberInStreams is MaxNumberInStreams functional argument
+func SessionMaxNumberInStreams(v int) SessionArg {
+	return func(s *Session) { s.MaxNumberInStreams = v }
+}
+
 // NewSession creates a new RTP session.
 //
 // A RTP session requires two transports:
 //   tpw - a transport that implements the RtpTransportWrite interface
 //   tpr - a transport that implements the RtpTransportRecv interface
 //
-func NewSession(tpw TransportWrite, tpr TransportRecv) *Session {
+func NewSession(tpw TransportWrite, tpr TransportRecv, fnArgs ...SessionArg) *Session {
 	rs := new(Session)
 
+	rs.dataReceiveChanLen = defaultDataReceiveChanLen
+	rs.ctrlEventChanLen = defaultCtrlEventChanLen
+	rs.MaxNumberOutStreams = defaultMaxNumberOutStreams
+	rs.MaxNumberInStreams = defaultMaxNumberInStreams
+
+	for _, fn := range fnArgs {
+		fn(rs)
+	}
+
 	// Maps grow dynamically, set size to avoid resizing in normal cases.
-	rs.streamsOut = make(streamOutMap, maxNumberOutStreams)
-	rs.streamsIn = make(streamInMap, maxNumberInStreams)
+	rs.streamsOut = make(streamOutMap, rs.MaxNumberOutStreams)
+	rs.streamsIn = make(streamInMap, rs.MaxNumberInStreams)
 	rs.remotes = make(remoteMap, 2)
 	rs.conflicts = make(conflictMap, 2)
-
-	rs.MaxNumberOutStreams = maxNumberOutStreams
-	rs.MaxNumberInStreams = maxNumberInStreams
 
 	rs.transportWrite = tpw
 	rs.transportRecv = tpr
@@ -328,7 +360,7 @@ func (rs *Session) NewDataPacketForStream(streamIndex uint32, stamp uint32) *Dat
 // If the channel is full then the RTP receiver discards the data packets.
 //
 func (rs *Session) CreateDataReceiveChan() DataReceiveChan {
-	rs.dataReceiveChan = make(DataReceiveChan, dataReceiveChanLen)
+	rs.dataReceiveChan = make(DataReceiveChan, rs.dataReceiveChanLen)
 	return rs.dataReceiveChan
 }
 
@@ -349,7 +381,7 @@ func (rs *Session) RemoveDataReceiveChan() {
 // If the channel is full then the RTCP receiver does not send control events.
 //
 func (rs *Session) CreateCtrlEventChan() CtrlEventChan {
-	rs.ctrlEventChan = make(CtrlEventChan, ctrlEventChanLen)
+	rs.ctrlEventChan = make(CtrlEventChan, rs.ctrlEventChanLen)
 	return rs.ctrlEventChan
 }
 

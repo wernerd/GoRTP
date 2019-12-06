@@ -28,13 +28,13 @@ import (
 )
 
 const (
-	dataReceiveChanLen = 3
-	ctrlEventChanLen   = 3
+	defaultDataReceiveChanLen = 3
+	defaultCtrlEventChanLen   = 3
 )
 
 const (
-	maxNumberOutStreams = 5
-	maxNumberInStreams  = 30
+	defaultMaxNumberOutStreams = 5
+	defaultMaxNumberInStreams  = 30
 )
 
 // conflictAddr stores conflicting address detected during loop and collision check
