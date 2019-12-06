@@ -112,6 +112,14 @@ func (rp *RawPacket) Buffer() []byte {
 	return rp.buffer
 }
 
+// Write writes data bytes from data buffer to the underlying RawPacket.
+func (rp *RawPacket) Write(data []byte) (int, error) {
+	rp.buffer = data
+	rp.inUse = len(data)
+	rp.isFree = true
+	return rp.inUse, nil
+}
+
 // InUse returns the number of valid bytes in the packet buffer.
 // Several function modify the inUse variable, for example when copying payload or setting extensions
 // in the RTP packet. Thus "buffer[0:inUse]" is the slice inside the buffer that will be sent or
@@ -123,6 +131,12 @@ func (rp *RawPacket) InUse() int {
 // *** RTP specific functions start here ***
 
 // DataPacket RTP packet type to define RTP specific functions
+//
+// if you want to copy incoming RTP packet as-is. For example
+// when you need to redirect RTP packet from WebRTC to plain RTP:
+//   pkt := rtp.DataPacket{}
+//   pkt.Write(buf.Bytes())
+//   session.WriteData(&pkt)
 type DataPacket struct {
 	RawPacket
 	payloadLength int16
