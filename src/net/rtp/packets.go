@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"sync"
 )
 
 const (
@@ -90,9 +91,13 @@ const (
 	reportBlockLen = 24
 )
 
-// nullArray is what it's names says: a long array filled with zeros.
-// used to clear (fill with zeros) arrays/slices inside a buffer by copying.
-var nullArray = make([]byte, bufferSize)
+var (
+	// nullArray is what it's names says: a long array filled with zeros.
+	// used to clear (fill with zeros) arrays/slices inside a buffer by copying.
+	nullArray []byte = nil
+
+	nullArrayInitOnce sync.Once
+)
 
 var bufferSize int = defaultBufferSize
 

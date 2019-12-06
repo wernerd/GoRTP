@@ -313,6 +313,10 @@ func (strm *SsrcStream) fillSenderInfo(info senderInfo) {
 
 // makeSdesChunk creates an SDES chunk at the current inUse position and returns offset that points after the chunk.
 func (strm *SsrcStream) makeSdesChunk(rc *CtrlPacket) (newOffset int) {
+	nullArrayInitOnce.Do(func() {
+		nullArray = make([]byte, bufferSize)
+	})
+
 	chunk, newOffset := rc.newSdesChunk(strm.sdesChunkLen)
 	copy(chunk, nullArray[:]) // fill with zeros before using
 	chunk.setSsrc(strm.ssrc)
