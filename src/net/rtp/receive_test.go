@@ -62,7 +62,7 @@ func newSenderPacket(stamp uint32) (rp *DataPacket) {
 	rp = rsSender.NewDataPacket(stamp)
 
 	// initialize with "sender" address to enable all necessary checks
-	rp.fromAddr.IpAddr = senderAddr.IP
+	rp.fromAddr.IPAddr = senderAddr.IP
 	rp.fromAddr.DataPort = senderPort
 	rp.fromAddr.CtrlPort = 0
 	return
@@ -214,7 +214,7 @@ func rtpReceive(t *testing.T) {
 	// build a RTCP packet for the standard output stream
 	rcSender := rsRecv.buildRtcpPkt(rsRecv.SsrcStreamOut(), 31)
 
-	rcSender.fromAddr.IpAddr = senderAddr.IP
+	rcSender.fromAddr.IPAddr = senderAddr.IP
 	rcSender.fromAddr.DataPort = 0
 	rcSender.fromAddr.CtrlPort = senderPort + 1
 
@@ -257,9 +257,9 @@ func rtpReceive(t *testing.T) {
 
 	rcSender = rsRecv.buildRtcpPkt(rsRecv.SsrcStreamOut(), 31)
 
-	rcSender.fromAddr.IpAddr = senderAddr.IP
+	rcSender.fromAddr.IPAddr = senderAddr.IP
 	rcSender.fromAddr.DataPort = 0
-	rcSender.fromAddr.CtrlPort = senderPort + 3 // just to avoid an addtional conflict - but collosion will happen
+	rcSender.fromAddr.CtrlPort = senderPort + 3 // just to avoid an additional conflict - but collosion will happen
 
 	// ***    fmt.Printf("2nd Ctrl buffer: %s\n", hex.EncodeToString(rcSender.buffer[:rcSender.InUse()]))
 	rcTotalLength = rcSender.InUse()

@@ -43,6 +43,7 @@ const (
 	isClosed
 )
 
+// SdesItemMap item map, indexed by the RTCP SDES item types constants.
 type SdesItemMap map[int]string
 
 // ctrlStatistics holds data relevant to compute RTCP Receive Reports (RR) and this is part of SsrcStreamIn
@@ -134,13 +135,13 @@ const seqNumMod = (1 << 16)
  */
 
 // Ssrc returns the SSRC of this stream in host order.
-func (str *SsrcStream) Ssrc() uint32 {
-	return str.ssrc
+func (strm *SsrcStream) Ssrc() uint32 {
+	return strm.ssrc
 }
 
 // SequenceNo returns the current RTP packet sequence number of this stream in host order.
-func (str *SsrcStream) SequenceNo() uint16 {
-	return str.sequenceNumber
+func (strm *SsrcStream) SequenceNo() uint16 {
+	return strm.sequenceNumber
 }
 
 // SetPayloadType sets the payload type of this stream.
@@ -155,23 +156,23 @@ func (str *SsrcStream) SequenceNo() uint16 {
 //
 //  pt - the payload type number.
 //
-func (str *SsrcStream) SetPayloadType(pt byte) (ok bool) {
+func (strm *SsrcStream) SetPayloadType(pt byte) (ok bool) {
 	if _, ok = PayloadFormatMap[int(pt)]; !ok {
 		return
 	}
-	str.payloadType = pt
+	strm.payloadType = pt
 	return
 }
 
 // PayloadType returns the payload type of this stream.
-func (str *SsrcStream) PayloadType() byte {
-	return str.payloadType
+func (strm *SsrcStream) PayloadType() byte {
+	return strm.payloadType
 }
 
 // StreamType returns stream's type, either input stream or otput stream.
 //
-func (str *SsrcStream) StreamType() int {
-	return str.streamType
+func (strm *SsrcStream) StreamType() int {
+	return strm.streamType
 }
 
 /*
@@ -191,7 +192,7 @@ func newSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16) (so *SsrcStr
 	if sequenceNo == 0 {
 		so.newSequence()
 	}
-	so.IpAddr = own.IpAddr
+	so.IPAddr = own.IPAddr
 	so.DataPort = own.DataPort
 	so.CtrlPort = own.CtrlPort
 	so.Zone = own.Zone
@@ -218,13 +219,13 @@ func newSsrcStreamOut(own *Address, ssrc uint32, sequenceNo uint16) (so *SsrcStr
 //
 //   stamp - the RTP timestamp for this packet.
 //
-func (str *SsrcStream) newDataPacket(stamp uint32) (rp *DataPacket) {
+func (strm *SsrcStream) newDataPacket(stamp uint32) (rp *DataPacket) {
 	rp = newDataPacket()
-	rp.SetSsrc(str.ssrc)
-	rp.SetPayloadType(str.payloadType)
-	rp.SetTimestamp(stamp + str.initialStamp)
-	rp.SetSequence(str.sequenceNumber)
-	str.sequenceNumber++
+	rp.SetSsrc(strm.ssrc)
+	rp.SetPayloadType(strm.payloadType)
+	rp.SetTimestamp(stamp + strm.initialStamp)
+	rp.SetSequence(strm.sequenceNumber)
+	strm.sequenceNumber++
 	return
 }
 
@@ -237,84 +238,86 @@ func (str *SsrcStream) newDataPacket(stamp uint32) (rp *DataPacket) {
 //   streamindex - the index of the output stream as returned by NewSsrcStreamOut
 //   stamp       - the RTP timestamp for this packet.
 //
-func (str *SsrcStream) newCtrlPacket(pktType int) (rp *CtrlPacket, offset int) {
+func (strm *SsrcStream) newCtrlPacket(pktType int) (rp *CtrlPacket, offset int) {
 	rp, offset = newCtrlPacket()
 	rp.SetType(0, pktType)
-	rp.SetSsrc(0, str.ssrc)
+	rp.SetSsrc(0, strm.ssrc)
 	return
 }
 
 // AddHeaderCtrl adds a new fixed RTCP header word into the compound, does not set SSRC after fixed header field
-func (str *SsrcStream) addCtrlHeader(rp *CtrlPacket, offset, pktType int) (newOffset int) {
+func (strm *SsrcStream) addCtrlHeader(rp *CtrlPacket, offset, pktType int) (newOffset int) {
 	newOffset = rp.addHeaderCtrl(offset)
 	rp.SetType(offset, pktType)
 	return
 }
 
 // newSsrc generates a random SSRC and sets it in stream
-func (str *SsrcStream) newSsrc() {
+func (strm *SsrcStream) newSsrc() {
 	var randBuf [4]byte
 	rand.Read(randBuf[:])
 	ssrc := uint32(randBuf[0])
 	ssrc |= uint32(randBuf[1]) << 8
 	ssrc |= uint32(randBuf[2]) << 16
 	ssrc |= uint32(randBuf[3]) << 24
-	str.ssrc = ssrc
+	strm.ssrc = ssrc
 
 }
 
 // newInitialTimestamp creates a random initiali timestamp for outgoing packets
-func (str *SsrcStream) newInitialTimestamp() {
+func (strm *SsrcStream) newInitialTimestamp() {
 	var randBuf [4]byte
 	rand.Read(randBuf[:])
 	tmp := uint32(randBuf[0])
 	tmp |= uint32(randBuf[1]) << 8
 	tmp |= uint32(randBuf[2]) << 16
 	tmp |= uint32(randBuf[3]) << 24
-	str.initialStamp = (tmp & 0xFFFFFFF)
+	strm.initialStamp = (tmp & 0xFFFFFFF)
 }
 
 // newSequence generates a random sequence and sets it in stream
-func (str *SsrcStream) newSequence() {
+func (strm *SsrcStream) newSequence() {
 	var randBuf [2]byte
 	rand.Read(randBuf[:])
 	sequenceNo := uint16(randBuf[0])
 	sequenceNo |= uint16(randBuf[1]) << 8
 	sequenceNo &= 0xEFFF
-	str.sequenceNumber = sequenceNo
+	strm.sequenceNumber = sequenceNo
 }
 
 // readRecvReport reads data from receive report and fills it into output stream RecvReportData structure
-func (so *SsrcStream) readRecvReport(report recvReport) {
-	so.FracLost = report.packetsLostFrac()
-	so.PacketsLost = report.packetsLost()
-	so.HighestSeqNo = report.highestSeq()
-	so.Jitter = report.jitter()
-	so.LastSr = report.lsr()
-	so.Dlsr = report.dlsr()
+func (strm *SsrcStream) readRecvReport(report recvReport) {
+	strm.FracLost = report.packetsLostFrac()
+	strm.PacketsLost = report.packetsLost()
+	strm.HighestSeqNo = report.highestSeq()
+	strm.Jitter = report.jitter()
+	strm.LastSr = report.lsr()
+	strm.Dlsr = report.dlsr()
 }
 
 // fillSenderInfo fills in the senderInfo.
-func (so *SsrcStream) fillSenderInfo(info senderInfo) {
-	info.setOctetCount(so.SenderOctectCnt)
-	info.setPacketCount(so.SenderPacketCnt)
+func (strm *SsrcStream) fillSenderInfo(info senderInfo) {
+	info.setOctetCount(strm.SenderOctectCnt)
+	info.setPacketCount(strm.SenderPacketCnt)
 	tm := time.Now().UnixNano()
 	sec, frac := toNtpStamp(tm)
 	info.setNtpTimeStamp(sec, frac)
 
-	tm1 := uint32(tm-so.initialTime) / 1e6                               // time since session creation in ms
-	tm1 *= uint32(PayloadFormatMap[int(so.payloadType)].ClockRate / 1e3) // compute number of samples
-	tm1 += so.initialStamp
-	info.setRtpTimeStamp(tm1)
+	tm1 := uint32(tm-strm.initialTime) / 1e6 // time since session creation in ms
+	if v, ok := PayloadFormatMap[int(strm.payloadType)]; ok {
+		tm1 *= uint32(v.ClockRate / 1e3) // compute number of samples
+		tm1 += strm.initialStamp
+		info.setRtpTimeStamp(tm1)
+	}
 }
 
 // makeSdesChunk creates an SDES chunk at the current inUse position and returns offset that points after the chunk.
-func (so *SsrcStream) makeSdesChunk(rc *CtrlPacket) (newOffset int) {
-	chunk, newOffset := rc.newSdesChunk(so.sdesChunkLen)
+func (strm *SsrcStream) makeSdesChunk(rc *CtrlPacket) (newOffset int) {
+	chunk, newOffset := rc.newSdesChunk(strm.sdesChunkLen)
 	copy(chunk, nullArray[:]) // fill with zeros before using
-	chunk.setSsrc(so.ssrc)
+	chunk.setSsrc(strm.ssrc)
 	itemOffset := 4
-	for itemType, name := range so.SdesItems {
+	for itemType, name := range strm.SdesItems {
 		itemOffset += chunk.setItemData(itemOffset, byte(itemType), name)
 	}
 	return
@@ -322,13 +325,13 @@ func (so *SsrcStream) makeSdesChunk(rc *CtrlPacket) (newOffset int) {
 
 // SetSdesItem set a new SDES item or overwrites an existing one with new text (string).
 // An application shall set at least a CNAME SDES item text otherwise w use a default string.
-func (so *SsrcStream) SetSdesItem(itemType int, itemText string) bool {
+func (strm *SsrcStream) SetSdesItem(itemType int, itemText string) bool {
 	if itemType <= SdesEnd || itemType >= sdesMax {
 		return false
 	}
-	so.SdesItems[itemType] = itemText
+	strm.SdesItems[itemType] = itemText
 	length := 4 // Initialize with SSRC length
-	for _, name := range so.SdesItems {
+	for _, name := range strm.SdesItems {
 		length += 2 + len(name) // add length of each item
 	}
 	if rem := length & 0x3; rem == 0 { // if already multiple of 4 add another 4 that holds "end" marker byte plus 3 bytes padding
@@ -336,19 +339,19 @@ func (so *SsrcStream) SetSdesItem(itemType int, itemText string) bool {
 	} else {
 		length += 4 - rem
 	}
-	so.sdesChunkLen = length
+	strm.sdesChunkLen = length
 	return true
 }
 
 // makeByeData creates a by data block after the BYE RTCP header field.
 // Currently only one SSRC for bye data supported. Additional CSRCs requiere addiitonal data structure in output stream.
-func (so *SsrcStream) makeByeData(rc *CtrlPacket, reason string) (newOffset int) {
+func (strm *SsrcStream) makeByeData(rc *CtrlPacket, reason string) (newOffset int) {
 	length := 4
 	if len(reason) > 0 {
 		length += (len(reason) + 3 + 1) & ^3 // plus one is the length field
 	}
 	bye, newOffset := rc.newByeData(length)
-	bye.setSsrc(0, so.ssrc)
+	bye.setSsrc(0, strm.ssrc)
 	if len(reason) > 0 {
 		bye.setReason(reason, 1)
 	}
@@ -363,48 +366,48 @@ func (so *SsrcStream) makeByeData(rc *CtrlPacket, reason string) (newOffset int)
 
 // newSsrcStreamIn creates a new input stream and sets the variables required for
 // RTP and RTCP processing to well defined initial values.
-func newSsrcStreamIn(from *Address, ssrc uint32) (si *SsrcStream) {
-	si = new(SsrcStream)
-	si.streamType = InputStream
-	si.ssrc = ssrc
-	si.IpAddr = from.IpAddr
-	si.DataPort = from.DataPort
-	si.CtrlPort = from.CtrlPort
-	si.SdesItems = make(SdesItemMap, 2)
-	si.initStats()
+func newSsrcStreamIn(from *Address, ssrc uint32) (strm *SsrcStream) {
+	strm = new(SsrcStream)
+	strm.streamType = InputStream
+	strm.ssrc = ssrc
+	strm.IPAddr = from.IPAddr
+	strm.DataPort = from.DataPort
+	strm.CtrlPort = from.CtrlPort
+	strm.SdesItems = make(SdesItemMap, 2)
+	strm.initStats()
 	return
 }
 
 // checkSsrcIncomingData checks for collision or loops on incoming data packets.
 // Implements th algorithm found in chap 8.2 in RFC 3550
-func (si *SsrcStream) checkSsrcIncomingData(existingStream bool, rs *Session, rp *DataPacket) (result bool) {
+func (strm *SsrcStream) checkSsrcIncomingData(existingStream bool, rs *Session, rp *DataPacket) (result bool) {
 	result = true
 
 	// Test if the source is new and its SSRC is not already used in an output stream.
 	// Thus a new input stream without collision.
-	if !existingStream && !rs.isOutputSsrc(si.ssrc) {
+	if !existingStream && !rs.isOutputSsrc(strm.ssrc) {
 		return result
 	}
 
 	// Found an existing input stream. Check if it is still same address/port.
 	// if yes, no conflicts, no further checks required.
-	if si.DataPort != rp.fromAddr.DataPort || !si.IpAddr.Equal(rp.fromAddr.IpAddr) {
+	if strm.DataPort != rp.fromAddr.DataPort || !strm.IPAddr.Equal(rp.fromAddr.IPAddr) {
 		// SSRC collision or a loop has happened
-		strOut, _, localSsrc := rs.lookupSsrcMapOut(si.ssrc)
+		strOut, _, localSsrc := rs.lookupSsrcMapOut(strm.ssrc)
 		if !localSsrc { // Not a SSRC in use for own output (local SSRC)
 			// TODO: Optional error counter: Known SSRC stream changed address or port
 			// Note this differs from the default in the RFC. Discard packet only when the collision is
 			// repeating (to avoid flip-flopping)
-			if si.prevConflictAddr != nil &&
-				si.prevConflictAddr.IpAddr.Equal(rp.fromAddr.IpAddr) &&
-				si.prevConflictAddr.DataPort == rp.fromAddr.DataPort {
+			if strm.prevConflictAddr != nil &&
+				strm.prevConflictAddr.IPAddr.Equal(rp.fromAddr.IPAddr) &&
+				strm.prevConflictAddr.DataPort == rp.fromAddr.DataPort {
 				result = false // discard packet and do not flip-flop
 			} else {
 				// Record who has collided so that in the future we can know if the collision repeats.
-				si.prevConflictAddr = &Address{rp.fromAddr.IpAddr, rp.fromAddr.DataPort, 0, rp.fromAddr.Zone}
+				strm.prevConflictAddr = &Address{rp.fromAddr.IPAddr, rp.fromAddr.DataPort, 0, rp.fromAddr.Zone}
 				// Change sync source transport address
-				si.IpAddr = rp.fromAddr.IpAddr
-				si.DataPort = rp.fromAddr.DataPort
+				strm.IPAddr = rp.fromAddr.IPAddr
+				strm.DataPort = rp.fromAddr.DataPort
 			}
 		} else {
 			// Collision or loop of own packets. In this case si was found in ouput stream map,
@@ -418,10 +421,10 @@ func (si *SsrcStream) checkSsrcIncomingData(existingStream bool, rs *Session, rp
 				// renew the output stream's SSRC
 				rs.WriteCtrl(rs.buildRtcpByePkt(strOut, "SSRC collision detected when receiving RTCP packet."))
 				rs.replaceStream(strOut)
-				si.IpAddr = rp.fromAddr.IpAddr
-				si.DataPort = rp.fromAddr.DataPort
-				si.CtrlPort = 0
-				si.initStats()
+				strm.IPAddr = rp.fromAddr.IPAddr
+				strm.DataPort = rp.fromAddr.DataPort
+				strm.CtrlPort = 0
+				strm.initStats()
 			}
 		}
 	}
@@ -430,128 +433,128 @@ func (si *SsrcStream) checkSsrcIncomingData(existingStream bool, rs *Session, rp
 
 // recordReceptionData checks validity (probation), sequence numbers, computes jitter, and records the statistics for incoming data packets.
 // See algorithms in chapter A.1 (sequence number handling) and A.8 (jitter computation)
-func (si *SsrcStream) recordReceptionData(rp *DataPacket, rs *Session, recvTime int64) (result bool) {
+func (strm *SsrcStream) recordReceptionData(rp *DataPacket, rs *Session, recvTime int64) (result bool) {
 	result = true
 
 	seq := rp.Sequence()
 
-	if si.statistics.probation != 0 {
+	if strm.statistics.probation != 0 {
 		// source is not yet valid.
-		if seq == si.statistics.maxSeqNum+1 {
+		if seq == strm.statistics.maxSeqNum+1 {
 			// packet in sequence.
-			si.statistics.probation--
-			if si.statistics.probation == 0 {
-				si.statistics.seqNumAccum = 0
+			strm.statistics.probation--
+			if strm.statistics.probation == 0 {
+				strm.statistics.seqNumAccum = 0
 			} else {
 				result = false
 			}
 		} else {
 			// packet not in sequence.
-			si.statistics.probation = minSequential - 1
+			strm.statistics.probation = minSequential - 1
 			result = false
 		}
-		si.statistics.maxSeqNum = seq
+		strm.statistics.maxSeqNum = seq
 	} else {
 		// source was already valid.
-		step := seq - si.statistics.maxSeqNum
+		step := seq - strm.statistics.maxSeqNum
 		if step < maxDropout {
 			// Ordered, with not too high step.
-			if seq < si.statistics.maxSeqNum {
+			if seq < strm.statistics.maxSeqNum {
 				// sequene number wrapped.
-				si.statistics.seqNumAccum += seqNumMod
+				strm.statistics.seqNumAccum += seqNumMod
 			}
-			si.statistics.maxSeqNum = seq
+			strm.statistics.maxSeqNum = seq
 		} else if step <= (seqNumMod - maxMisorder) {
 			// too high step of the sequence number.
 			// TODO: check usage of baseSeqNum
-			if uint32(seq) == si.statistics.badSeqNum {
+			if uint32(seq) == strm.statistics.badSeqNum {
 				// Here we saw two sequential packets - assume other side restarted, so just re-sync
 				// and treat this packet as first packet
-				si.statistics.maxSeqNum = seq
-				si.statistics.baseSeqNum = seq
-				si.statistics.seqNumAccum = 0
-				si.statistics.badSeqNum = seqNumMod + 1
+				strm.statistics.maxSeqNum = seq
+				strm.statistics.baseSeqNum = seq
+				strm.statistics.seqNumAccum = 0
+				strm.statistics.badSeqNum = seqNumMod + 1
 			} else {
-				si.statistics.badSeqNum = uint32((seq + 1) & (seqNumMod - 1))
+				strm.statistics.badSeqNum = uint32((seq + 1) & (seqNumMod - 1))
 				// This additional check avoids that the very first packet from a source be discarded.
-				if si.statistics.packetCount > 0 {
+				if strm.statistics.packetCount > 0 {
 					result = false
 				} else {
-					si.statistics.maxSeqNum = seq
+					strm.statistics.maxSeqNum = seq
 				}
 			}
-		} else {
-			// duplicate or reordered packet
-		}
+		} // else {
+		// duplicate or reordered packet
+		// }
 	}
 
 	if result {
-		si.sequenceNumber = si.statistics.maxSeqNum
+		strm.sequenceNumber = strm.statistics.maxSeqNum
 		// the packet is considered valid.
-		si.statistics.packetCount++
-		si.statistics.octetCount += uint32(len(rp.Payload()))
-		if si.statistics.packetCount == 1 {
-			si.statistics.initialDataTimestamp = rp.Timestamp()
-			si.statistics.baseSeqNum = seq
+		strm.statistics.packetCount++
+		strm.statistics.octetCount += uint32(len(rp.Payload()))
+		if strm.statistics.packetCount == 1 {
+			strm.statistics.initialDataTimestamp = rp.Timestamp()
+			strm.statistics.baseSeqNum = seq
 		}
-		si.streamMutex.Lock()
-		si.statistics.lastPacketTime = recvTime
-		if !si.sender && rs.rtcpCtrlChan != nil {
+		strm.streamMutex.Lock()
+		strm.statistics.lastPacketTime = recvTime
+		if !strm.sender && rs.rtcpCtrlChan != nil {
 			rs.rtcpCtrlChan <- rtcpIncrementSender
 		}
-		si.sender = true // Stream is sender. If it was false new stream or no RTP packets for some time
-		si.dataAfterLastReport = true
-		si.streamMutex.Unlock()
+		strm.sender = true // Stream is sender. If it was false new stream or no RTP packets for some time
+		strm.dataAfterLastReport = true
+		strm.streamMutex.Unlock()
 
 		// compute the interarrival jitter estimation.
 		pt := int(rp.PayloadType())
 		// compute lastPacketTime to ms and clockrate as kHz
-		arrival := uint32(si.statistics.lastPacketTime / 1e6 * int64(PayloadFormatMap[pt].ClockRate/1e3))
+		arrival := uint32(strm.statistics.lastPacketTime / 1e6 * int64(PayloadFormatMap[pt].ClockRate/1e3))
 		transitTime := arrival - rp.Timestamp()
-		if si.statistics.lastPacketTransitTime != 0 {
-			delta := int32(transitTime - si.statistics.lastPacketTransitTime)
+		if strm.statistics.lastPacketTransitTime != 0 {
+			delta := int32(transitTime - strm.statistics.lastPacketTransitTime)
 			if delta < 0 {
 				delta = -delta
 			}
-			si.statistics.jitter += uint32(delta) - ((si.statistics.jitter + 8) >> 4)
+			strm.statistics.jitter += uint32(delta) - ((strm.statistics.jitter + 8) >> 4)
 		}
-		si.statistics.lastPacketTransitTime = transitTime
+		strm.statistics.lastPacketTransitTime = transitTime
 	}
 	return
 }
 
 // checkSsrcIncomingData checks for collision or loops on incoming data packets.
 // Implements th algorithm found in chap 8.2 in RFC 3550
-func (si *SsrcStream) checkSsrcIncomingCtrl(existingStream bool, rs *Session, from *Address) (result bool) {
+func (strm *SsrcStream) checkSsrcIncomingCtrl(existingStream bool, rs *Session, from *Address) (result bool) {
 	result = true
 
 	// Test if the source is new and its SSRC is not already used in an output stream.
 	// Thus a new input stream without collision.
-	if !existingStream && !rs.isOutputSsrc(si.ssrc) {
+	if !existingStream && !rs.isOutputSsrc(strm.ssrc) {
 		return result
 	}
 	// Found an existing input stream. Check if it is still same address/port.
 	// if yes, no conflicts, no further checks required.
-	if si.CtrlPort != from.CtrlPort || !si.IpAddr.Equal(from.IpAddr) {
+	if strm.CtrlPort != from.CtrlPort || !strm.IPAddr.Equal(from.IPAddr) {
 		// SSRC collision or a loop has happened
-		strOut, _, localSsrc := rs.lookupSsrcMapOut(si.ssrc)
+		strOut, _, localSsrc := rs.lookupSsrcMapOut(strm.ssrc)
 		if !localSsrc { // Not a SSRC in use for own output (local SSRC)
 			// TODO: Optional error counter: Know SSRC stream changed address or port
 			// Note this differs from the default in the RFC. Discard packet only when the collision is
 			// repeating (to avoid flip-flopping)
-			if si.prevConflictAddr != nil &&
-				si.prevConflictAddr.IpAddr.Equal(from.IpAddr) &&
-				si.prevConflictAddr.CtrlPort == from.CtrlPort {
+			if strm.prevConflictAddr != nil &&
+				strm.prevConflictAddr.IPAddr.Equal(from.IPAddr) &&
+				strm.prevConflictAddr.CtrlPort == from.CtrlPort {
 				result = false // discard packet and do not flip-flop
 			} else {
 				// Record who has collided so that in the future we can know if the collision repeats.
-				si.prevConflictAddr = &Address{from.IpAddr, 0, from.CtrlPort, from.Zone}
+				strm.prevConflictAddr = &Address{from.IPAddr, 0, from.CtrlPort, from.Zone}
 				// Change sync source transport address
-				si.IpAddr = from.IpAddr
-				si.CtrlPort = from.CtrlPort
+				strm.IPAddr = from.IPAddr
+				strm.CtrlPort = from.CtrlPort
 			}
 		} else {
-			// Collision or loop of own packets. In this case strOut == si.
+			// Collision or loop of own packets. In this case strOut == strm.
 			if rs.checkConflictCtrl(from) {
 				// Optional error counter.
 				result = false
@@ -559,10 +562,10 @@ func (si *SsrcStream) checkSsrcIncomingCtrl(existingStream bool, rs *Session, fr
 				// New collision, dispatch a BYE using old SSRC, renew the output stream's SSRC
 				rs.WriteCtrl(rs.buildRtcpByePkt(strOut, "SSRC collision detected when receiving RTCP packet."))
 				rs.replaceStream(strOut)
-				si.IpAddr = from.IpAddr
-				si.DataPort = 0
-				si.CtrlPort = from.CtrlPort
-				si.initStats()
+				strm.IPAddr = from.IPAddr
+				strm.DataPort = 0
+				strm.CtrlPort = from.CtrlPort
+				strm.initStats()
 			}
 		}
 	}
@@ -572,21 +575,21 @@ func (si *SsrcStream) checkSsrcIncomingCtrl(existingStream bool, rs *Session, fr
 // makeRecvReport fills a receiver report at the current inUse position and returns offset that points after the report.
 // See chapter A.3 in RFC 3550 regarding the packet lost algorithm, end of chapter 6.4.1 regarding LSR, DLSR stuff.
 //
-func (si *SsrcStream) makeRecvReport(rp *CtrlPacket) (newOffset int) {
+func (strm *SsrcStream) makeRecvReport(rp *CtrlPacket) (newOffset int) {
 
 	report, newOffset := rp.newRecvReport()
 
-	extMaxSeq := si.statistics.seqNumAccum + uint32(si.statistics.maxSeqNum)
-	expected := extMaxSeq - uint32(si.statistics.baseSeqNum) + 1
-	lost := expected - si.statistics.packetCount
-	if si.statistics.packetCount == 0 {
+	extMaxSeq := strm.statistics.seqNumAccum + uint32(strm.statistics.maxSeqNum)
+	expected := extMaxSeq - uint32(strm.statistics.baseSeqNum) + 1
+	lost := expected - strm.statistics.packetCount
+	if strm.statistics.packetCount == 0 {
 		lost = 0
 	}
-	expectedDelta := expected - si.statistics.expectedPrior
-	si.statistics.expectedPrior = expected
+	expectedDelta := expected - strm.statistics.expectedPrior
+	strm.statistics.expectedPrior = expected
 
-	receivedDelta := si.statistics.packetCount - si.statistics.receivedPrior
-	si.statistics.receivedPrior = si.statistics.packetCount
+	receivedDelta := strm.statistics.packetCount - strm.statistics.receivedPrior
+	strm.statistics.receivedPrior = strm.statistics.packetCount
 
 	lostDelta := expectedDelta - receivedDelta
 
@@ -596,78 +599,78 @@ func (si *SsrcStream) makeRecvReport(rp *CtrlPacket) (newOffset int) {
 	}
 
 	var lsr, dlsr uint32
-	if si.statistics.lastRtcpSrTime != 0 {
-		sec, frac := toNtpStamp(si.statistics.lastRtcpSrTime)
+	if strm.statistics.lastRtcpSrTime != 0 {
+		sec, frac := toNtpStamp(strm.statistics.lastRtcpSrTime)
 		ntp := (sec << 32) | frac
 		lsr = ntp >> 16
-		sec, frac = toNtpStamp(time.Now().UnixNano() - si.statistics.lastRtcpSrTime)
+		sec, frac = toNtpStamp(time.Now().UnixNano() - strm.statistics.lastRtcpSrTime)
 		ntp = (sec << 32) | frac
 		dlsr = ntp >> 16
 	}
 
-	report.setSsrc(si.ssrc)
+	report.setSsrc(strm.ssrc)
 	report.setPacketsLost(lost)
 	report.setPacketsLostFrac(fracLost)
 	report.setHighestSeq(extMaxSeq)
-	report.setJitter(si.statistics.jitter >> 4)
+	report.setJitter(strm.statistics.jitter >> 4)
 	report.setLsr(lsr)
 	report.setDlsr(dlsr)
 
 	return
 }
 
-func (si *SsrcStream) readSenderInfo(info senderInfo) {
+func (strm *SsrcStream) readSenderInfo(info senderInfo) {
 	seconds, fraction := info.ntpTimeStamp()
-	si.NtpTime = fromNtp(seconds, fraction)
-	si.RtpTimestamp = info.rtpTimeStamp()
-	si.SenderPacketCnt = info.packetCount()
-	si.SenderOctectCnt = info.octetCount()
+	strm.NtpTime = fromNtp(seconds, fraction)
+	strm.RtpTimestamp = info.rtpTimeStamp()
+	strm.SenderPacketCnt = info.packetCount()
+	strm.SenderOctectCnt = info.octetCount()
 }
 
 // goodBye marks this source as having sent a BYE control packet.
-func (si *SsrcStream) goodbye() bool {
-	if !si.statistics.flag {
+func (strm *SsrcStream) goodbye() bool {
+	if !strm.statistics.flag {
 		return false
 	}
-	si.statistics.flag = false
+	strm.statistics.flag = false
 	return true
 }
 
 // hello marks this source as having sent some packet.
-func (si *SsrcStream) hello() bool {
-	if si.statistics.flag {
+func (strm *SsrcStream) hello() bool {
+	if strm.statistics.flag {
 		return false
 	}
-	si.statistics.flag = true
+	strm.statistics.flag = true
 	return true
 }
 
 // initStats initializes all RTCP statistic counters and other relevant data.
-func (si *SsrcStream) initStats() {
-	si.statistics.lastPacketTime = 0
-	si.statistics.lastRtcpPacketTime = 0
-	si.statistics.lastRtcpSrTime = 0
+func (strm *SsrcStream) initStats() {
+	strm.statistics.lastPacketTime = 0
+	strm.statistics.lastRtcpPacketTime = 0
+	strm.statistics.lastRtcpSrTime = 0
 
-	si.statistics.packetCount = 0
-	si.statistics.octetCount = 0
-	si.statistics.maxSeqNum = 0
-	si.statistics.extendedMaxSeqNum = 0
-	si.statistics.cumulativePacketLost = 0
-	si.statistics.fractionLost = 0
-	si.statistics.jitter = 0
-	si.statistics.initialDataTimestamp = 0
-	si.statistics.initialDataTime = 0
-	si.statistics.flag = false
+	strm.statistics.packetCount = 0
+	strm.statistics.octetCount = 0
+	strm.statistics.maxSeqNum = 0
+	strm.statistics.extendedMaxSeqNum = 0
+	strm.statistics.cumulativePacketLost = 0
+	strm.statistics.fractionLost = 0
+	strm.statistics.jitter = 0
+	strm.statistics.initialDataTimestamp = 0
+	strm.statistics.initialDataTime = 0
+	strm.statistics.flag = false
 
-	si.statistics.badSeqNum = seqNumMod + 1
-	si.statistics.probation = minSequential
-	si.statistics.baseSeqNum = 0
-	si.statistics.expectedPrior = 0
-	si.statistics.receivedPrior = 0
-	si.statistics.seqNumAccum = 0
+	strm.statistics.badSeqNum = seqNumMod + 1
+	strm.statistics.probation = minSequential
+	strm.statistics.baseSeqNum = 0
+	strm.statistics.expectedPrior = 0
+	strm.statistics.receivedPrior = 0
+	strm.statistics.seqNumAccum = 0
 }
 
-func (si *SsrcStream) parseSdesChunk(sc sdesChunk) {
+func (strm *SsrcStream) parseSdesChunk(sc sdesChunk) {
 	offset := 4 // points after SSRC field of this chunk
 
 	for {
@@ -679,11 +682,11 @@ func (si *SsrcStream) parseSdesChunk(sc sdesChunk) {
 		txtLen := sc.getItemLen(offset)
 		itemTxt := sc.getItemText(offset, txtLen)
 		offset += 2 + txtLen
-		if name, ok := si.SdesItems[itemType]; ok && name == itemTxt {
+		if name, ok := strm.SdesItems[itemType]; ok && name == itemTxt {
 			continue
 		}
 		txt := make([]byte, len(itemTxt))
 		copy(txt, itemTxt)
-		si.SdesItems[itemType] = string(txt)
+		strm.SdesItems[itemType] = string(txt)
 	}
 }

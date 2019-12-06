@@ -17,7 +17,7 @@
 //
 
 /*
-The GoRTP package rtp implements the RTP/RTCP protocol.
+Package GoRTP implements the RTP/RTCP protocol.
 
 This Go implementation of the RTP/RTCP protocol uses a set of structures to
 provide a high degree of flexibility and to adhere to the RFC 3550 notation of
