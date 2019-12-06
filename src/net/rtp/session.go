@@ -168,8 +168,22 @@ func NewSession(tpw TransportWrite, tpr TransportRecv) *Session {
 //
 //   remote - the RTP address of the remote peer. The RTP data port number must be even.
 //
-func (rs *Session) AddRemote(remote *Address) (index uint32, err error) {
-	if (remote.DataPort & 0x1) == 0x1 {
+func (rs *Session) AddRemote(remote *Address) (uint32, error) {
+	return rs.addRemote(remote, true)
+}
+
+// AddRemoteNonStrict acts as AddRemote, but doesn't performs any
+// port number even/odd checks
+//
+// It is usefull when you pick 2 random ports via OS.
+// net.ResolveTCPAddr("tcp", "localhost:0") for example.
+// Random ports are not always even or odd.
+func (rs *Session) AddRemoteNonStrict(remote *Address) (uint32, error) {
+	return rs.addRemote(remote, false)
+}
+
+func (rs *Session) addRemote(remote *Address, strict bool) (index uint32, err error) {
+	if strict && (remote.DataPort&0x1) == 0x1 {
 		return 0, Error("RTP data port number is not an even number.")
 	}
 
