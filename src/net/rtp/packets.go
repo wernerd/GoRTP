@@ -120,9 +120,32 @@ func (rp *RawPacket) InUse() int {
 	return rp.inUse
 }
 
+// SetIsFree sets isFree attr
+func (rp *RawPacket) SetIsFree(v bool) {
+	rp.isFree = v
+}
+
+// SetBuffer set buffer
+func (rp *RawPacket) SetBuffer(b []byte) {
+	rp.buffer = b
+}
+
+// SetInUse sets real buffer size
+func (raw *RawPacket) SetInUse(iu int) {
+	raw.inUse = iu
+}
+
 // *** RTP specific functions start here ***
 
 // DataPacket RTP packet type to define RTP specific functions
+//
+// if you want to copy incoming RTP packet as-is. For example
+// when you need to redirect RTP packet from WebRTC to plain RTP:
+//   pkt := rtp.DataPacket{}
+//   pkt.SetBuffer(buf.Bytes())
+//   pkt.SetInUse(buf.Len())
+//   pkt.SetIsFree(true)
+//   session.WriteData(&pkt)
 type DataPacket struct {
 	RawPacket
 	payloadLength int16
