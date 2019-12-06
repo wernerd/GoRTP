@@ -2,7 +2,7 @@
 
 This Go package implements a RTP/RTCP stack for Go. The package is a
 sub-package of the standard Go _net_ package and uses standard _net_ package
-functions. 
+functions.
 
 ## How to build
 
@@ -61,11 +61,11 @@ particular the package documentation (doc.go).
 * The current release V1.0.0 computes the RTCP intervals based on the length of
   RTCP compound packets and the bandwidth allocated to RTCP. The application may
   set the bandwidth, if no set GoRTP makes somes educated guesses.
-  
+
 * The application may set the maximum number of output and input streams even
   while the RTP session is active. If the application des not set GoRTP sets
   the values to 5 and 30 respectively.
-  
+
 * GoRTP produces SR and RR reports and the associated SDES for active streams
   only, thus it implements the activity check as defined in chapter 6.4
 
@@ -79,7 +79,7 @@ particular the package documentation (doc.go).
   or DSL based networks. The MTU is usually about 1500 bytes, GoRTP limits
   the RTP/RTCP packet size to 1200 bytes. The length of an RR is 24 bytes,
   thus 31 RR already require 774 bytes. Adding some data for SR and SDES fills
-  the rest. 
+  the rest.
 
 * An application may register to a control event channel and GoRTP delivers a
   nice set of control and error events. The events cover:
@@ -88,5 +88,5 @@ particular the package documentation (doc.go).
   - RTCP events to inform about RTCP packets and received reports
   - Error events
 
-* Currently GoRTP supports only SR, RR, SDES, and BYE RTCP packets. Inside 
+* Currently GoRTP supports only SR, RR, SDES, and BYE RTCP packets. Inside
 SDES GoRTP does not support SDES Private and SDES H.323 items.
