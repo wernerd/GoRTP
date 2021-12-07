@@ -62,11 +62,14 @@ package rtp
 // 35-71     Unassigned      ?
 // 72-76     Reserved for RTCP conflict avoidance                                  [RFC3551]
 // 77-95     Unassigned      ?
-// 96-127    dynamic         ?                                                     [RFC3551]
+// 96-100    dynamic         ?                                                     [RFC3551]
+// 101       DTMF            ?                                                     [RFC2833]
+// 102-127   dynamic         ?                                                     [RFC3551]
 
 const (
 	Audio = 1
 	Video = 2
+	Event = 3
 )
 
 // PayloadFormat holds RTP payload formats.
@@ -136,5 +139,7 @@ func init() {
 	// 35-71     Unassigned      ?
 	// 72-76     Reserved for RTCP conflict avoidance
 	// 77-95     Unassigned      ?
-	// 96-127    dynamic         ?
+	// 96-100    dynamic         ?
+	PayloadFormatMap[101] = &PayloadFormat{101, Event, 8000, 0, "DTMF"}
+	// 102-127   dynamic         ?
 }
