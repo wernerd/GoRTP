@@ -12,6 +12,15 @@ information about this structure run `go help gopath` and follow the
 instructions. The _rtp_ package is below the package _net_ to make clear that
 _rtp_ is a network related package.
 
+Note: the latest update support Go modules. Actually, the repository contains
+two modules: one in `src/net/rtp` which defines the RTP implementation. The
+second module is in `src/net/rtpmain` and contains the demo program. The
+usual Go commands to build and run apply. To run the demo program 
+`cd src/net/rtpmain` and run `go build ./...` to create the executable.
+The `rtpmain` module references to the `rtp` module, see `go.mod`.
+
+The next two paragraphs apply if you use the old GOPATH.
+
 To build the package just run `go build net/rtp` and then `go install
 net/rtp`. To excecute the tests just run `go test net/rtp`. The tests check if
 the code works with the current Go installation on your system. It should
@@ -20,6 +29,7 @@ PASS.
 A demo program is available and is called _rtpmain_. Use `go build
 net/rtpmain` to build it. The command `go install net/rtpmain` installs it in
 the `bin` directory of the main directory.
+
 
 ## How to use
 

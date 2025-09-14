@@ -22,7 +22,7 @@ import (
 	//    "encoding/hex"
 	"fmt"
 	"net"
-	"net/rtp"
+	"github.com/wernerd/GoRTP/src/net/rtp"
 	"time"
 )
 
