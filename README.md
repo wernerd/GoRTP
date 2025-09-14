@@ -6,20 +6,23 @@ functions.
 
 ## How to build
 
-The _rtp_ sources use the GOPATH directory structure. To build, test, and run
-the software just add the main goRTP directory to GOPATH. For further
-information about this structure run `go help gopath` and follow the
-instructions. The _rtp_ package is below the package _net_ to make clear that
-_rtp_ is a network related package.
+The _rtp_ sources use the GOPATH directory structure. 
 
-Note: the latest update support Go modules. Actually, the repository contains
-two modules: one in `src/net/rtp` which defines the RTP implementation. The
-second module is in `src/net/rtpmain` and contains the demo program. The
-usual Go commands to build and run apply. To run the demo program 
-`cd src/net/rtpmain` and run `go build ./...` to create the executable.
-The `rtpmain` module references to the `rtp` module, see `go.mod`.
+Note: the latest update also supports Go modules. 
+
+Actually, the repository contains two modules: one in `src/net/rtp` which
+defines the RTP implementation. The second module is in `src/net/rtpmain`
+and contains the demo program. The usual Go commands to build and run apply.
+To run the demo program `cd src/net/rtpmain` and run `go build ./...` to
+create the executable. The `rtpmain` module references to the `rtp` module,
+see `go.mod`.
 
 The next two paragraphs apply if you use the old GOPATH.
+
+To build, test, and run the software just add the main goRTP directory to
+GOPATH. For further information about this structure run `go help gopath`
+and follow the instructions. The _rtp_ package is below the package _net_
+to make clear that _rtp_ is a network related package.
 
 To build the package just run `go build net/rtp` and then `go install
 net/rtp`. To excecute the tests just run `go test net/rtp`. The tests check if
@@ -36,10 +39,10 @@ the `bin` directory of the main directory.
 This is a pure RTP / RTCP stack and it does not contain any media processing,
 for example generating or packing the payload for audio or video codecs.
 
-The directory `src/net/rtpmain` contains an example Go program that performs a
-RTP some tests on _localhost_ that shows how to setup a RTP session, an
-output stream and how to send and receive RTP data and control events. Parts
-of this program are used in the package documentation.
+The directory `src/net/rtpmain` contains an example Go program that performs
+some RTP and RTCP tests on _localhost_ that shows how to setup a RTP session,
+an output stream and how to send and receive RTP data and control events.
+Parts of this program are used in the package documentation.
 
 The software should be ready to use for many RTP applications. Standard
 point-to-point RTP applications should not pose any problems. RTP multi-cast
@@ -47,9 +50,9 @@ using IP multi-cast addresses is not supported. If somebody really requires IP
 multi-cast it could be added at the transport level.
 
 RTCP reporting works without support from application. The stack reports RTCP
-packets and if the stack created new input streams and an application may
+packets and if the stack created new input streams an application may
 connect to the control channel to receive the RTCP events. Just have a look
-into the example program. The RTCP fields in the stream structures are
+to the example program. The RTCP fields in the stream structures are
 accessible - however, to use them you may need to have some know-how of the
 RTCP definitions and reporting.
 
@@ -70,11 +73,11 @@ particular the package documentation (doc.go).
 
 * The current release V1.0.0 computes the RTCP intervals based on the length of
   RTCP compound packets and the bandwidth allocated to RTCP. The application may
-  set the bandwidth, if no set GoRTP makes somes educated guesses.
+  set the bandwidth, if not set GoRTP makes somes educated guesses.
 
 * The application may set the maximum number of output and input streams even
-  while the RTP session is active. If the application des not set GoRTP sets
-  the values to 5 and 30 respectively.
+  while the RTP session is active. If the application does not set it GoRTP
+  sets the values to 5 and 30 respectively.
 
 * GoRTP produces SR and RR reports and the associated SDES for active streams
   only, thus it implements the activity check as defined in chapter 6.4
@@ -99,4 +102,4 @@ particular the package documentation (doc.go).
   - Error events
 
 * Currently GoRTP supports only SR, RR, SDES, and BYE RTCP packets. Inside
-SDES GoRTP does not support SDES Private and SDES H.323 items.
+  SDES GoRTP does not support SDES Private and SDES H.323 items.
